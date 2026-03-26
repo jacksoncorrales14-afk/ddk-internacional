@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+}
+
+model Candidato {
+  id                String   @id @default(cuid())
+  nombre            String
+  cedula            String   @unique
+  email             String
+  telefono          String
+  direccion         String
+  puesto            String   // "seguridad" o "limpieza"
+  experiencia       String?  @db.Text
+  aniosExperiencia  Int      @default(0)
+  portacionArma     Boolean  @default(false)
+  licenciaConducir  Boolean  @default(false)
+  cursoBasicoPolicial Boolean @default(false)
+  disponibilidad    String?
+  estado            String   @default("pendiente") // pendiente, aprobado, rechazado
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  atestados Atestado[]
+}
+
+model Atestado {
+  id          String    @id @default(cuid())
+  nombre      String
+  url         String
+  tipo        String    // cedula, antecedentes, curriculum, etc.
+  candidatoId String
+  candidato   Candidato @relation(fields: [candidatoId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+}
+
+model Trabajador {
+  id        String   @id @default(cuid())
+  nombre    String
+  cedula    String   @unique
+  email     String
+  telefono  String
+  puesto    String   // "seguridad" o "limpieza"
+  ubicacion String   // nombre del puesto/lugar asignado
+  activo    Boolean  @default(true)
+  password  String
+  createdAt DateTime @default(now())
+
+  registros RegistroHorario[]
+  rondas    Ronda[]
+}
+
+model RegistroHorario {
+  id           String     @id @default(cuid())
+  trabajadorId String
+  trabajador   Trabajador @relation(fields: [trabajadorId], references: [id], onDelete: Cascade)
+  tipo         String     // "entrada" o "salida"
+  fecha        DateTime   @default(now())
+  ubicacion    String?
+  nota         String?
+
+  @@index([trabajadorId, fecha])
+}
+
+model Ronda {
+  id            String     @id @default(cuid())
+  trabajadorId  String
+  trabajador    Trabajador @relation(fields: [trabajadorId], references: [id], onDelete: Cascade)
+  fecha         DateTime   @default(now())
+  ubicacion     String
+  observaciones String?    @db.Text
+  novedades     String?    @db.Text
+
+  @@index([trabajadorId, fecha])
+}
