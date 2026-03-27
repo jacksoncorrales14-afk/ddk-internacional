@@ -9,14 +9,14 @@ export const authOptions: NextAuthOptions = {
       id: "admin-login",
       name: "Admin",
       credentials: {
-        email: { label: "Email", type: "email" },
+        identificacion: { label: "Identificacion", type: "text" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        if (!credentials?.identificacion || !credentials?.password) return null;
 
         const admin = await prisma.admin.findUnique({
-          where: { email: credentials.email },
+          where: { identificacion: credentials.identificacion },
         });
 
         if (!admin) return null;
@@ -26,7 +26,7 @@ export const authOptions: NextAuthOptions = {
 
         return {
           id: admin.id,
-          email: admin.email,
+          email: admin.identificacion,
           name: admin.name,
           role: "admin",
         };

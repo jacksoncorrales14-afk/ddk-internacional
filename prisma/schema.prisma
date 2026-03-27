@@ -9,18 +9,19 @@ datasource db {
 }
 
 model Admin {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      String   @default("admin")
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  identificacion String   @unique
+  password       String
+  name           String
+  role           String   @default("admin")
+  createdAt      DateTime @default(now())
 }
 
 model Candidato {
   id                String   @id @default(cuid())
   nombre            String
-  cedula            String   @unique
+  tipoDocumento     String   @default("cedula") // "cedula", "pasaporte", "dimex"
+  cedula            String   @unique // numero del documento (cedula, pasaporte o dimex)
   email             String
   telefono          String
   direccion         String
@@ -28,7 +29,7 @@ model Candidato {
   experiencia       String?  @db.Text
   aniosExperiencia  Int      @default(0)
   portacionArma     Boolean  @default(false)
-  licenciaConducir  Boolean  @default(false)
+  licenciaConducir  String?  // null = no tiene, o tipo: "B1", "B2", "B3", "B4", "A1", "A2", "A3", "C2", "C3", "D1", "D2", "D3", "E1"
   cursoBasicoPolicial Boolean @default(false)
   disponibilidad    String?
   estado            String   @default("pendiente") // pendiente, aprobado, rechazado
@@ -60,8 +61,9 @@ model Trabajador {
   password  String
   createdAt DateTime @default(now())
 
-  registros RegistroHorario[]
-  rondas    Ronda[]
+  registros  RegistroHorario[]
+  rondas     Ronda[]
+  bitacoras  Bitacora[]
 }
 
 model RegistroHorario {
@@ -84,6 +86,18 @@ model Ronda {
   ubicacion     String
   observaciones String?    @db.Text
   novedades     String?    @db.Text
+
+  @@index([trabajadorId, fecha])
+}
+
+model Bitacora {
+  id            String     @id @default(cuid())
+  trabajadorId  String
+  trabajador    Trabajador @relation(fields: [trabajadorId], references: [id], onDelete: Cascade)
+  fecha         DateTime   @default(now())
+  incidencias   String     @db.Text
+  entregaA      String     // nombre de la persona a quien se entrega el puesto
+  puesto        String     // ubicacion/puesto donde ocurrieron las incidencias
 
   @@index([trabajadorId, fecha])
 }

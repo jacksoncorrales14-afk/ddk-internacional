@@ -4,8 +4,6 @@ import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { Providers } from "@/components/Providers";
 
-export const dynamic = "force-dynamic";
-
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -25,7 +23,7 @@ export default function RootLayout({
           <Navbar />
           <main className="min-h-screen">{children}</main>
           <footer className="border-t border-gray-200 bg-primary-700 py-8 text-center text-sm text-primary-200">
-            <p>&copy; 2025 DDK Internacional. Todos los derechos reservados.</p>
+            <p>&copy; 2026 DDK Internacional. Todos los derechos reservados.</p>
           </footer>
         </Providers>
       </body>

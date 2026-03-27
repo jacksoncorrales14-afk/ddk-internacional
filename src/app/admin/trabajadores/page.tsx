@@ -3,18 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-
-interface Trabajador {
-  id: string;
-  nombre: string;
-  cedula: string;
-  email: string;
-  telefono: string;
-  puesto: string;
-  ubicacion: string;
-  activo: boolean;
-  createdAt: string;
-}
+import { Trabajador } from "@/types/models";
 
 export default function TrabajadoresPage() {
   const { data: session, status } = useSession();
@@ -146,6 +135,8 @@ export default function TrabajadoresPage() {
                   <th className="px-6 py-3">Puesto</th>
                   <th className="px-6 py-3">Ubicacion</th>
                   <th className="px-6 py-3">Estado</th>
+                  <th className="px-6 py-3">Dias Trabajados</th>
+                  <th className="px-6 py-3">Horas Totales</th>
                   <th className="px-6 py-3">Acciones</th>
                 </tr>
               </thead>
@@ -158,11 +149,17 @@ export default function TrabajadoresPage() {
                     <td className="px-6 py-4 text-sm text-gray-500">{t.ubicacion}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                        t.activo ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
+                        !t.activo
+                          ? "bg-gray-100 text-gray-600"
+                          : t.enServicio
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
                       }`}>
-                        {t.activo ? "Activo" : "Inactivo"}
+                        {!t.activo ? "Inactivo" : t.enServicio ? "Activo" : "Ausente"}
                       </span>
                     </td>
+                    <td className="px-6 py-4 text-sm text-gray-500 text-center">{t.diasTrabajados}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500 text-center">{t.horasTotales}h</td>
                     <td className="px-6 py-4">
                       <button
                         onClick={() => toggleActivo(t.id, t.activo)}

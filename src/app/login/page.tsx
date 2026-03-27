@@ -10,9 +10,11 @@ export default function LoginPage() {
   const [tab, setTab] = useState<"admin" | "trabajador">("trabajador");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [recuperando, setRecuperando] = useState(false);
+  const [recuperarMsg, setRecuperarMsg] = useState("");
 
   // Admin fields
-  const [email, setEmail] = useState("");
+  const [identificacion, setIdentificacion] = useState("");
   const [password, setPassword] = useState("");
 
   // Trabajador fields
@@ -25,7 +27,7 @@ export default function LoginPage() {
     setLoading(true);
 
     const result = await signIn("admin-login", {
-      email,
+      identificacion,
       password,
       redirect: false,
     });
@@ -37,6 +39,31 @@ export default function LoginPage() {
       router.push("/admin");
       router.refresh();
     }
+  };
+
+  const handleRecuperar = async () => {
+    if (!identificacion) {
+      setError("Ingresa tu numero de identificacion primero");
+      return;
+    }
+    setRecuperando(true);
+    setError("");
+    setRecuperarMsg("");
+    try {
+      const res = await fetch("/api/admin/recuperar-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identificacion }),
+      });
+      if (res.ok) {
+        setRecuperarMsg("Se envio una nueva contraseña al correo autorizado");
+      } else {
+        setError("Error al procesar la solicitud");
+      }
+    } catch {
+      setError("Error de conexion");
+    }
+    setRecuperando(false);
   };
 
   const handleTrabajador = async (e: React.FormEvent) => {
@@ -71,7 +98,7 @@ export default function LoginPage() {
           {/* Tabs */}
           <div className="mb-6 flex rounded-lg bg-gray-100 p-1">
             <button
-              onClick={() => { setTab("trabajador"); setError(""); }}
+              onClick={() => { setTab("trabajador"); setError(""); setRecuperarMsg(""); }}
               className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
                 tab === "trabajador" ? "bg-primary-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-900"
               }`}
@@ -79,7 +106,7 @@ export default function LoginPage() {
               Trabajador
             </button>
             <button
-              onClick={() => { setTab("admin"); setError(""); }}
+              onClick={() => { setTab("admin"); setError(""); setRecuperarMsg(""); }}
               className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
                 tab === "admin" ? "bg-primary-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-900"
               }`}
@@ -123,13 +150,13 @@ export default function LoginPage() {
           ) : (
             <form onSubmit={handleAdmin} className="space-y-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Numero de Identificacion</label>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="text"
+                  value={identificacion}
+                  onChange={(e) => setIdentificacion(e.target.value)}
                   className="input-field"
-                  placeholder="admin@ddk.com"
+                  placeholder="Tu numero de identificacion"
                   required
                 />
               </div>
@@ -147,6 +174,17 @@ export default function LoginPage() {
               <button type="submit" className="btn-primary w-full" disabled={loading}>
                 {loading ? "Ingresando..." : "Ingresar"}
               </button>
+              <button
+                type="button"
+                onClick={handleRecuperar}
+                disabled={recuperando}
+                className="w-full text-center text-sm text-primary-600 hover:text-primary-800"
+              >
+                {recuperando ? "Enviando..." : "Olvide mi contraseña"}
+              </button>
+              {recuperarMsg && (
+                <div className="rounded-lg bg-green-50 p-3 text-sm text-green-600">{recuperarMsg}</div>
+              )}
             </form>
           )}
         </div>

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { validarCodigoQR } from "@/lib/qr";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -10,13 +9,13 @@ export async function GET() {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const registros = await prisma.registroHorario.findMany({
+  const bitacoras = await prisma.bitacora.findMany({
     where: { trabajadorId: session.user.id },
     orderBy: { fecha: "desc" },
     take: 50,
   });
 
-  return NextResponse.json(registros);
+  return NextResponse.json(bitacoras);
 }
 
 export async function POST(req: NextRequest) {
@@ -25,30 +24,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const { tipo, nota, codigoQR } = await req.json();
+  const { incidencias, entregaA, puesto } = await req.json();
 
-  if (!tipo || !["entrada", "salida"].includes(tipo)) {
-    return NextResponse.json({ error: "Tipo invalido" }, { status: 400 });
+  if (!incidencias || !entregaA || !puesto) {
+    return NextResponse.json({ error: "Todos los campos son requeridos" }, { status: 400 });
   }
 
-  if (!codigoQR) {
-    return NextResponse.json({ error: "Debe escanear el codigo QR del puesto" }, { status: 400 });
-  }
-
-  // Validar código QR
-  const { valid, puesto } = validarCodigoQR(codigoQR);
-  if (!valid) {
-    return NextResponse.json({ error: "Codigo QR invalido" }, { status: 400 });
-  }
-
-  const registro = await prisma.registroHorario.create({
+  const bitacora = await prisma.bitacora.create({
     data: {
       trabajadorId: session.user.id,
-      tipo,
-      ubicacion: puesto,
-      nota: nota || null,
+      incidencias,
+      entregaA,
+      puesto,
     },
   });
 
-  return NextResponse.json(registro, { status: 201 });
+  return NextResponse.json(bitacora, { status: 201 });
 }

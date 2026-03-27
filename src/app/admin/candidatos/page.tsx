@@ -3,28 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-
-interface Atestado {
-  id: string;
-  nombre: string;
-  url: string;
-  tipo: string;
-}
-
-interface Candidato {
-  id: string;
-  nombre: string;
-  cedula: string;
-  email: string;
-  telefono: string;
-  direccion: string;
-  puesto: string;
-  experiencia: string;
-  disponibilidad: string;
-  estado: string;
-  createdAt: string;
-  atestados: Atestado[];
-}
+import { Candidato, tipoDocLabels } from "@/types/models";
 
 export default function CandidatosPage() {
   const { data: session, status } = useSession();
@@ -48,6 +27,7 @@ export default function CandidatosPage() {
   }, [session]);
 
   const actualizarEstado = async (id: string, estado: string) => {
+    if (estado === "rechazado" && !confirm("¿Estas seguro de rechazar este candidato?")) return;
     await fetch(`/api/candidatos/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -101,7 +81,7 @@ export default function CandidatosPage() {
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-900">{detalle.nombre}</h2>
-              <button onClick={() => setDetalle(null)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setDetalle(null)} className="text-gray-400 hover:text-gray-600" aria-label="Cerrar">
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -109,11 +89,14 @@ export default function CandidatosPage() {
             </div>
 
             <div className="mb-6 grid gap-3 sm:grid-cols-2">
-              <div><span className="text-xs text-gray-500">Cedula:</span><p className="font-medium">{detalle.cedula}</p></div>
+              <div><span className="text-xs text-gray-500">{tipoDocLabels[detalle.tipoDocumento] || "Documento"}:</span><p className="font-medium">{detalle.cedula}</p></div>
               <div><span className="text-xs text-gray-500">Email:</span><p className="font-medium">{detalle.email}</p></div>
               <div><span className="text-xs text-gray-500">Telefono:</span><p className="font-medium">{detalle.telefono}</p></div>
               <div><span className="text-xs text-gray-500">Puesto:</span><p className="font-medium capitalize">{detalle.puesto}</p></div>
               <div className="sm:col-span-2"><span className="text-xs text-gray-500">Direccion:</span><p className="font-medium">{detalle.direccion}</p></div>
+              {detalle.licenciaConducir && (
+                <div><span className="text-xs text-gray-500">Licencia de Conducir:</span><p className="font-medium">{detalle.licenciaConducir}</p></div>
+              )}
               {detalle.experiencia && (
                 <div className="sm:col-span-2"><span className="text-xs text-gray-500">Experiencia:</span><p className="font-medium">{detalle.experiencia}</p></div>
               )}
@@ -137,7 +120,7 @@ export default function CandidatosPage() {
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 rounded-lg border border-gray-200 p-3 text-sm text-primary-600 transition-colors hover:bg-primary-50"
                   >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     {a.nombre}
@@ -169,7 +152,7 @@ export default function CandidatosPage() {
               <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
                 <tr>
                   <th className="px-6 py-3">Nombre</th>
-                  <th className="px-6 py-3">Cedula</th>
+                  <th className="px-6 py-3">Documento</th>
                   <th className="px-6 py-3">Puesto</th>
                   <th className="px-6 py-3">Estado</th>
                   <th className="px-6 py-3">Docs</th>
@@ -181,7 +164,10 @@ export default function CandidatosPage() {
                 {filtrados.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{c.nombre}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{c.cedula}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      <span className="text-xs text-gray-400 uppercase">{tipoDocLabels[c.tipoDocumento] || "Doc"}: </span>
+                      {c.cedula}
+                    </td>
                     <td className="px-6 py-4 text-sm capitalize text-gray-500">{c.puesto}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${

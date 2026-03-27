@@ -6,7 +6,10 @@ export default function AplicarPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [archivos, setArchivos] = useState<File[]>([]);
+  const [archivoCV, setArchivoCV] = useState<File | null>(null);
+  const [archivoDelincuencia, setArchivoDelincuencia] = useState<File | null>(null);
+  const [archivoDocumento, setArchivoDocumento] = useState<File | null>(null);
+  const [archivoFoto, setArchivoFoto] = useState<File | null>(null);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -16,10 +19,23 @@ export default function AplicarPage() {
     const form = e.currentTarget;
     const formData = new FormData(form);
 
-    // Agregar archivos
-    archivos.forEach((archivo) => {
-      formData.append("archivos", archivo);
-    });
+    // Agregar archivos con su tipo
+    if (archivoCV) {
+      formData.append("archivos", archivoCV);
+      formData.append("tiposArchivo", "cv");
+    }
+    if (archivoDelincuencia) {
+      formData.append("archivos", archivoDelincuencia);
+      formData.append("tiposArchivo", "hoja-delincuencia");
+    }
+    if (archivoDocumento) {
+      formData.append("archivos", archivoDocumento);
+      formData.append("tiposArchivo", "documento-identificacion");
+    }
+    if (archivoFoto) {
+      formData.append("archivos", archivoFoto);
+      formData.append("tiposArchivo", "foto-pasaporte");
+    }
 
     try {
       const res = await fetch("/api/candidatos", {
@@ -38,12 +54,6 @@ export default function AplicarPage() {
       setError("Error de conexion. Intenta de nuevo.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setArchivos(Array.from(e.target.files));
     }
   };
 
@@ -80,14 +90,29 @@ export default function AplicarPage() {
       <form onSubmit={handleSubmit} className="card space-y-6">
         <h2 className="text-lg font-bold text-gray-900">Datos Personales</h2>
 
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Nombre Completo <span className="text-red-500">*</span>
+          </label>
+          <input name="nombre" type="text" className="input-field" placeholder="Tu nombre completo" required />
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Nombre Completo</label>
-            <input name="nombre" type="text" className="input-field" placeholder="Tu nombre completo" required />
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Tipo de Documento <span className="text-red-500">*</span>
+            </label>
+            <select name="tipoDocumento" className="input-field" required>
+              <option value="cedula">Cedula</option>
+              <option value="pasaporte">Pasaporte</option>
+              <option value="dimex">DIMEX</option>
+            </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Cedula</label>
-            <input name="cedula" type="text" className="input-field" placeholder="Numero de cedula" required />
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Numero de Documento <span className="text-red-500">*</span>
+            </label>
+            <input name="cedula" type="text" className="input-field" placeholder="Numero de documento" required />
           </div>
         </div>
 
@@ -97,14 +122,18 @@ export default function AplicarPage() {
             <input name="email" type="email" className="input-field" placeholder="tu@email.com" required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Telefono</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Telefono <span className="text-red-500">*</span>
+            </label>
             <input name="telefono" type="tel" className="input-field" placeholder="8888-8888" required />
           </div>
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Direccion</label>
-          <input name="direccion" type="text" className="input-field" placeholder="Tu direccion completa" required />
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Direccion Exacta <span className="text-red-500">*</span>
+          </label>
+          <input name="direccion" type="text" className="input-field" placeholder="Provincia, canton, distrito, senas exactas" required />
         </div>
 
         <div>
@@ -118,7 +147,7 @@ export default function AplicarPage() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Años de Experiencia</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Anos de Experiencia</label>
             <input name="aniosExperiencia" type="number" min="0" className="input-field" placeholder="0" required />
           </div>
           <div>
@@ -148,13 +177,37 @@ export default function AplicarPage() {
               <p className="text-xs text-gray-500">Permiso vigente de portacion de arma de fuego</p>
             </div>
           </label>
-          <label className="flex items-center gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
-            <input name="licenciaConducir" type="checkbox" value="true" className="h-5 w-5 rounded border-gray-300 text-primary-600" />
-            <div>
-              <span className="text-sm font-medium text-gray-900">Licencia de Conducir</span>
-              <p className="text-xs text-gray-500">Licencia de conducir vigente</p>
-            </div>
-          </label>
+
+          <div className="rounded-lg border border-gray-200 p-3">
+            <label className="mb-2 block text-sm font-medium text-gray-900">Licencia de Conducir</label>
+            <select name="licenciaConducir" className="input-field">
+              <option value="">No poseo licencia</option>
+              <optgroup label="Tipo A - Motocicletas">
+                <option value="A1">A1 - Motocicletas menores de 125cc</option>
+                <option value="A2">A2 - Motocicletas de 125cc en adelante</option>
+                <option value="A3">A3 - Triciclos motorizados</option>
+              </optgroup>
+              <optgroup label="Tipo B - Vehiculos livianos y buses">
+                <option value="B1">B1 - Automoviles y microbuses (hasta 8 pasajeros)</option>
+                <option value="B2">B2 - Vehiculos de carga liviana y taxis</option>
+                <option value="B3">B3 - Buses de hasta 35 pasajeros</option>
+                <option value="B4">B4 - Buses de mas de 35 pasajeros</option>
+              </optgroup>
+              <optgroup label="Tipo C - Vehiculos de carga">
+                <option value="C2">C2 - Camiones livianos y medianos</option>
+                <option value="C3">C3 - Vehiculos pesados y articulados</option>
+              </optgroup>
+              <optgroup label="Tipo D - Equipo especial">
+                <option value="D1">D1 - Equipo especial liviano</option>
+                <option value="D2">D2 - Equipo especial pesado</option>
+                <option value="D3">D3 - Equipo especial agricola</option>
+              </optgroup>
+              <optgroup label="Tipo E - Maquinaria">
+                <option value="E1">E1 - Maquinaria agricola e industrial</option>
+              </optgroup>
+            </select>
+          </div>
+
           <label className="flex items-center gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
             <input name="cursoBasicoPolicial" type="checkbox" value="true" className="h-5 w-5 rounded border-gray-300 text-primary-600" />
             <div>
@@ -166,29 +219,55 @@ export default function AplicarPage() {
 
         <hr className="border-gray-200" />
 
-        <h2 className="text-lg font-bold text-gray-900">Atestados / Documentos</h2>
-        <p className="text-sm text-gray-500">
-          Sube tu cedula, antecedentes penales, curriculum, certificaciones u otros documentos relevantes.
-          Puedes seleccionar varios archivos.
+        <h2 className="text-lg font-bold text-gray-900">Documentos</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Sube los siguientes documentos en formato PDF, JPG o PNG.
         </p>
 
-        <div>
-          <input
-            type="file"
-            multiple
-            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-            onChange={handleFileChange}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-primary-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-700 hover:file:bg-primary-200"
-          />
-          {archivos.length > 0 && (
-            <div className="mt-3 space-y-1">
-              {archivos.map((f, i) => (
-                <p key={i} className="text-sm text-gray-600">
-                  {f.name} ({(f.size / 1024).toFixed(0)} KB)
-                </p>
-              ))}
-            </div>
-          )}
+        <div className="space-y-4">
+          <div className="rounded-lg border border-gray-200 p-4">
+            <label className="mb-2 block text-sm font-medium text-gray-900">Curriculum Vitae (CV)</label>
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+              onChange={(e) => setArchivoCV(e.target.files?.[0] || null)}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-primary-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-700 hover:file:bg-primary-200"
+            />
+            {archivoCV && <p className="mt-1 text-xs text-gray-500">{archivoCV.name} ({(archivoCV.size / 1024).toFixed(0)} KB)</p>}
+          </div>
+
+          <div className="rounded-lg border border-gray-200 p-4">
+            <label className="mb-2 block text-sm font-medium text-gray-900">Hoja de Delincuencia</label>
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={(e) => setArchivoDelincuencia(e.target.files?.[0] || null)}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-primary-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-700 hover:file:bg-primary-200"
+            />
+            {archivoDelincuencia && <p className="mt-1 text-xs text-gray-500">{archivoDelincuencia.name} ({(archivoDelincuencia.size / 1024).toFixed(0)} KB)</p>}
+          </div>
+
+          <div className="rounded-lg border border-gray-200 p-4">
+            <label className="mb-2 block text-sm font-medium text-gray-900">Copia del Documento de Identificacion</label>
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={(e) => setArchivoDocumento(e.target.files?.[0] || null)}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-primary-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-700 hover:file:bg-primary-200"
+            />
+            {archivoDocumento && <p className="mt-1 text-xs text-gray-500">{archivoDocumento.name} ({(archivoDocumento.size / 1024).toFixed(0)} KB)</p>}
+          </div>
+
+          <div className="rounded-lg border border-gray-200 p-4">
+            <label className="mb-2 block text-sm font-medium text-gray-900">Fotografia Tamano Pasaporte</label>
+            <input
+              type="file"
+              accept=".jpg,.jpeg,.png"
+              onChange={(e) => setArchivoFoto(e.target.files?.[0] || null)}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-primary-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-700 hover:file:bg-primary-200"
+            />
+            {archivoFoto && <p className="mt-1 text-xs text-gray-500">{archivoFoto.name} ({(archivoFoto.size / 1024).toFixed(0)} KB)</p>}
+          </div>
         </div>
 
         <button type="submit" className="btn-primary w-full" disabled={loading}>

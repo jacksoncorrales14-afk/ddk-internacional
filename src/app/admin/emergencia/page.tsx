@@ -3,61 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-
-interface Atestado {
-  id: string;
-  nombre: string;
-  url: string;
-  tipo: string;
-}
-
-interface Candidato {
-  id: string;
-  nombre: string;
-  cedula: string;
-  email: string;
-  telefono: string;
-  puesto: string;
-  experiencia: string;
-  aniosExperiencia: number;
-  portacionArma: boolean;
-  licenciaConducir: boolean;
-  cursoBasicoPolicial: boolean;
-  disponibilidad: string;
-  estado: string;
-  atestados: Atestado[];
-}
-
-type Medalla = "oro" | "plata" | "bronce";
-
-function calcularPuntaje(c: Candidato): number {
-  let pts = 0;
-  pts += c.aniosExperiencia * 10;
-  if (c.portacionArma) pts += 25;
-  if (c.licenciaConducir) pts += 20;
-  if (c.cursoBasicoPolicial) pts += 25;
-  if (c.atestados.length >= 3) pts += 20;
-  else if (c.atestados.length >= 1) pts += 10;
-  return pts;
-}
-
-function getMedalla(c: Candidato): Medalla {
-  const tieneTodo =
-    c.portacionArma &&
-    c.licenciaConducir &&
-    c.cursoBasicoPolicial &&
-    c.atestados.length >= 3 &&
-    c.aniosExperiencia >= 2;
-
-  const tieneBastante =
-    (c.portacionArma || c.licenciaConducir || c.cursoBasicoPolicial) &&
-    c.atestados.length >= 1 &&
-    c.aniosExperiencia >= 1;
-
-  if (tieneTodo) return "oro";
-  if (tieneBastante) return "plata";
-  return "bronce";
-}
+import { Candidato, calcularPuntaje, getMedalla } from "@/types/models";
 
 const medallaConfig = {
   oro: {
