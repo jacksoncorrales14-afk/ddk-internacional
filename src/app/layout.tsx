@@ -9,6 +9,20 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "DDK Internacional - Seguridad",
   description: "Plataforma de reclutamiento y gestión de personal - DDK Internacional Seguridad",
+  manifest: "/manifest.json",
+  themeColor: "#1b3a5c",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "DDK Internacional",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({
