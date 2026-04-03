@@ -72,6 +72,25 @@ export async function escanearPuntoRonda(data: {
     throw new Error("Este punto ya fue escaneado en esta ronda");
   }
 
+  // Verificar orden - detectar si se salto algun punto
+  const puntosRuta = await prisma.puntoRuta.findMany({
+    where: { ubicacion: ronda.ubicacion },
+    orderBy: { orden: "asc" },
+  });
+  const puntoActual = puntosRuta.find((p) => p.id === puntoId);
+  const puntosEscaneadosIds = new Set(ronda.escaneos.map((e) => e.puntoRutaId));
+
+  let warning: string | null = null;
+  if (puntoActual) {
+    const puntosSaltados = puntosRuta.filter(
+      (p) => p.orden < puntoActual.orden && !puntosEscaneadosIds.has(p.id)
+    );
+    if (puntosSaltados.length > 0) {
+      const nombres = puntosSaltados.map((p) => p.nombre).join(", ");
+      warning = `Se saltaron puntos de la ruta: ${nombres}`;
+    }
+  }
+
   const escaneo = await prisma.escaneoRonda.create({
     data: {
       rondaId: data.rondaId,
@@ -96,6 +115,7 @@ export async function escanearPuntoRonda(data: {
     puntosEscaneados: totalEscaneos,
     totalPuntos: ronda.totalPuntos,
     completada: totalEscaneos >= ronda.totalPuntos,
+    warning,
   };
 }
 

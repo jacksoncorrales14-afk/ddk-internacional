@@ -33,6 +33,7 @@ export default function RondaSection({ rondas, loading, onSuccess, onRefresh }: 
   const [scanning, setScanning] = useState(false);
   const [ubicacion, setUbicacion] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [warningMsg, setWarningMsg] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [novedades, setNovedades] = useState("");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -121,6 +122,11 @@ export default function RondaSection({ rondas, loading, onSuccess, onRefresh }: 
           escaneos: [...prev.escaneos, data.escaneo],
           completada: data.completada,
         } : null);
+        if (data.warning) {
+          setWarningMsg(data.warning);
+        } else {
+          setWarningMsg("");
+        }
         onSuccess(`Punto "${data.escaneo.puntoRuta.nombre}" escaneado (${data.puntosEscaneados}/${data.totalPuntos})`);
         onRefresh();
       } else {
@@ -154,6 +160,14 @@ export default function RondaSection({ rondas, loading, onSuccess, onRefresh }: 
 
       {errorMsg && (
         <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">{errorMsg}</div>
+      )}
+      {warningMsg && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
+          <svg className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+          <p className="text-sm text-amber-800"><span className="font-semibold">Atencion:</span> {warningMsg}</p>
+        </div>
       )}
 
       {!rondaActiva ? (
@@ -288,38 +302,49 @@ export default function RondaSection({ rondas, loading, onSuccess, onRefresh }: 
             </div>
           )}
 
-          {/* Observaciones al finalizar */}
-          {rondaActiva.completada && (
-            <div className="space-y-3">
-              <textarea
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-                className="input-field"
-                rows={2}
-                placeholder="Observaciones generales de la ronda (opcional)"
-              />
-              <textarea
-                value={novedades}
-                onChange={(e) => setNovedades(e.target.value)}
-                className="input-field"
-                rows={2}
-                placeholder="Novedades o situaciones fuera de lo normal (opcional)"
-              />
+          {/* Observaciones y finalizar */}
+          <div className="space-y-3 mt-4">
+            <textarea
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+              className="input-field"
+              rows={2}
+              placeholder="Observaciones generales de la ronda (opcional)"
+            />
+            <textarea
+              value={novedades}
+              onChange={(e) => setNovedades(e.target.value)}
+              className="input-field"
+              rows={2}
+              placeholder="Novedades o situaciones fuera de lo normal (opcional)"
+            />
+
+            {rondaActiva.completada ? (
               <button onClick={finalizarRonda} className="btn-primary w-full">
                 Finalizar Ronda
               </button>
-            </div>
-          )}
-
-          {/* Cancelar ronda */}
-          {!rondaActiva.completada && (
-            <button
-              onClick={() => { setRondaActiva(null); setUbicacion(""); }}
-              className="mt-2 w-full text-center text-xs text-gray-400 hover:text-gray-600"
-            >
-              Cancelar ronda
-            </button>
-          )}
+            ) : (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    if (confirm(`La ronda tiene ${rondaActiva.escaneos.length}/${rondaActiva.totalPuntos} puntos. ¿Deseas terminarla como incompleta?`)) {
+                      finalizarRonda();
+                    }
+                  }}
+                  className="btn-secondary flex-1"
+                  disabled={rondaActiva.escaneos.length === 0}
+                >
+                  Terminar Ronda Incompleta
+                </button>
+                <button
+                  onClick={() => { setRondaActiva(null); setUbicacion(""); setWarningMsg(""); }}
+                  className="text-xs text-gray-400 hover:text-gray-600"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

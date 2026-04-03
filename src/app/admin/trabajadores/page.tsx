@@ -50,6 +50,12 @@ export default function TrabajadoresPage() {
     mutate();
   }, [mutate]);
 
+  const handleDelete = useCallback(async (id: string, nombre: string) => {
+    if (!confirm(`¿Estas seguro de eliminar a ${nombre}? Esta accion no se puede deshacer y se eliminaran todos sus registros.`)) return;
+    await fetch(`/api/admin/trabajadores/${id}`, { method: "DELETE" });
+    mutate();
+  }, [mutate]);
+
   const regenerarCodigo = useCallback(async (id: string) => {
     const res = await fetch(`/api/admin/trabajadores/${id}`, {
       method: "PATCH",
@@ -220,6 +226,12 @@ export default function TrabajadoresPage() {
                             Nuevo Codigo
                           </button>
                         )}
+                        <button
+                          onClick={() => handleDelete(t.id, t.nombre)}
+                          className="text-xs font-medium text-red-400 hover:text-red-600"
+                        >
+                          Eliminar
+                        </button>
                       </div>
                     </td>
                   </tr>

@@ -23,26 +23,37 @@ export async function crearRegistro(data: {
   trabajadorId: string;
   tipo: string;
   nota?: string;
-  codigoQR: string;
+  codigoQR?: string;
 }) {
   if (!["entrada", "salida"].includes(data.tipo)) {
     throw new Error("Tipo invalido");
   }
 
-  if (!data.codigoQR) {
-    throw new Error("Debe escanear el codigo QR del puesto");
-  }
+  let ubicacion: string | undefined;
 
-  const { valid, puesto } = validarCodigoQR(data.codigoQR);
-  if (!valid) {
-    throw new Error("Codigo QR invalido");
+  if (data.tipo === "entrada") {
+    if (!data.codigoQR) {
+      throw new Error("Debe escanear el codigo QR del puesto");
+    }
+    const { valid, puesto } = validarCodigoQR(data.codigoQR);
+    if (!valid) {
+      throw new Error("Codigo QR invalido");
+    }
+    ubicacion = puesto;
+  } else {
+    // Para salida, usar la ubicacion de la ultima entrada
+    const ultimaEntrada = await prisma.registroHorario.findFirst({
+      where: { trabajadorId: data.trabajadorId, tipo: "entrada" },
+      orderBy: { fecha: "desc" },
+    });
+    ubicacion = ultimaEntrada?.ubicacion || undefined;
   }
 
   return prisma.registroHorario.create({
     data: {
       trabajadorId: data.trabajadorId,
       tipo: data.tipo,
-      ubicacion: puesto,
+      ubicacion: ubicacion || null,
       nota: data.nota || null,
     },
   });

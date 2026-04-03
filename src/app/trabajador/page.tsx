@@ -37,7 +37,7 @@ export default function TrabajadorPage() {
   };
 
   const marcar = async (tipo: "entrada" | "salida") => {
-    if (!scannedCode) {
+    if (tipo === "entrada" && !scannedCode) {
       setErrorMsg("Primero escanea el codigo QR del puesto");
       return;
     }
@@ -47,11 +47,11 @@ export default function TrabajadorPage() {
     const res = await fetch("/api/registros", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tipo, nota, codigoQR: scannedCode }),
+      body: JSON.stringify({ tipo, nota, codigoQR: scannedCode || undefined }),
     });
     const data = await res.json();
     if (res.ok) {
-      setMensaje(`${tipo === "entrada" ? "Entrada" : "Salida"} registrada en ${scannedPuesto}`);
+      setMensaje(`${tipo === "entrada" ? "Entrada" : "Salida"} registrada${scannedPuesto ? ` en ${scannedPuesto}` : ""}`);
       setNota("");
       setScannedCode("");
       setScannedPuesto("");
@@ -124,7 +124,7 @@ export default function TrabajadorPage() {
           <button onClick={() => marcar("entrada")} className="btn-primary flex-1" disabled={marcando || !scannedCode}>
             Marcar Entrada
           </button>
-          <button onClick={() => marcar("salida")} className="btn-danger flex-1" disabled={marcando || !scannedCode}>
+          <button onClick={() => marcar("salida")} className="btn-danger flex-1" disabled={marcando}>
             Marcar Salida
           </button>
         </div>

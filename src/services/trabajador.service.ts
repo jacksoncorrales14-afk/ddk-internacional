@@ -118,6 +118,10 @@ export async function marcarActivado(id: string) {
   });
 }
 
+export async function eliminarTrabajador(id: string) {
+  return prisma.trabajador.delete({ where: { id } });
+}
+
 export async function actualizarTrabajador(
   id: string,
   data: Record<string, unknown>
