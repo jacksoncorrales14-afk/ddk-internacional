@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { actualizarTrabajador, regenerarCodigo } from "@/services/trabajador.service";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -11,10 +11,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const data = await req.json();
 
-  const trabajador = await prisma.trabajador.update({
-    where: { id: params.id },
-    data,
-  });
+  // Regenerar codigo de activacion
+  if (data.regenerarCodigo) {
+    const trabajador = await regenerarCodigo(params.id);
+    return NextResponse.json(trabajador);
+  }
 
+  const trabajador = await actualizarTrabajador(params.id, data);
   return NextResponse.json(trabajador);
 }

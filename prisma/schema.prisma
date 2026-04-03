@@ -25,6 +25,7 @@ model Candidato {
   email             String
   telefono          String
   direccion         String
+  fechaNacimiento   DateTime?
   puesto            String   // "seguridad" o "limpieza"
   experiencia       String?  @db.Text
   aniosExperiencia  Int      @default(0)
@@ -37,6 +38,9 @@ model Candidato {
   updatedAt         DateTime @updatedAt
 
   atestados Atestado[]
+
+  @@index([estado])
+  @@index([puesto])
 }
 
 model Atestado {
@@ -50,20 +54,38 @@ model Atestado {
 }
 
 model Trabajador {
-  id        String   @id @default(cuid())
-  nombre    String
-  cedula    String   @unique
-  email     String
-  telefono  String
-  puesto    String   // "seguridad" o "limpieza"
-  ubicacion String   // nombre del puesto/lugar asignado
-  activo    Boolean  @default(true)
-  password  String
-  createdAt DateTime @default(now())
+  id                String   @id @default(cuid())
+  nombre            String
+  cedula            String   @unique
+  email             String
+  telefono          String
+  puesto            String   // "seguridad" o "limpieza"
+  ubicacion         String   // nombre del puesto/lugar asignado
+  activo            Boolean  @default(true)
+  password          String?  // deprecated - se mantiene por compatibilidad
+  codigoActivacion  String?  @unique // codigo temporal para registro biometrico
+  activado          Boolean  @default(false) // true cuando ya registro biometria
+  createdAt         DateTime @default(now())
 
-  registros  RegistroHorario[]
-  rondas     Ronda[]
-  bitacoras  Bitacora[]
+  registros    RegistroHorario[]
+  rondas       Ronda[]
+  bitacoras    Bitacora[]
+  credenciales WebAuthnCredential[]
+
+  @@index([activo])
+}
+
+model WebAuthnCredential {
+  id              String     @id @default(cuid())
+  trabajadorId    String
+  trabajador      Trabajador @relation(fields: [trabajadorId], references: [id], onDelete: Cascade)
+  credentialId    String     @unique
+  publicKey       Bytes
+  counter         BigInt     @default(0)
+  deviceName      String?
+  createdAt       DateTime   @default(now())
+
+  @@index([trabajadorId])
 }
 
 model RegistroHorario {
@@ -78,6 +100,19 @@ model RegistroHorario {
   @@index([trabajadorId, fecha])
 }
 
+model PuntoRuta {
+  id        String   @id @default(cuid())
+  nombre    String   // "Entrada Principal", "Parqueo Norte", etc.
+  ubicacion String   // "Jacaranda", "Malinches", etc.
+  orden     Int      // posicion en la ruta (1, 2, 3...)
+  createdAt DateTime @default(now())
+
+  escaneos EscaneoRonda[]
+
+  @@unique([ubicacion, orden])
+  @@index([ubicacion])
+}
+
 model Ronda {
   id            String     @id @default(cuid())
   trabajadorId  String
@@ -86,8 +121,24 @@ model Ronda {
   ubicacion     String
   observaciones String?    @db.Text
   novedades     String?    @db.Text
+  completada    Boolean    @default(false)
+  totalPuntos   Int        @default(0)
+
+  escaneos EscaneoRonda[]
 
   @@index([trabajadorId, fecha])
+}
+
+model EscaneoRonda {
+  id           String    @id @default(cuid())
+  rondaId      String
+  ronda        Ronda     @relation(fields: [rondaId], references: [id], onDelete: Cascade)
+  puntoRutaId  String
+  puntoRuta    PuntoRuta @relation(fields: [puntoRutaId], references: [id], onDelete: Cascade)
+  fecha        DateTime  @default(now())
+
+  @@unique([rondaId, puntoRutaId])
+  @@index([rondaId])
 }
 
 model Bitacora {
@@ -96,8 +147,8 @@ model Bitacora {
   trabajador    Trabajador @relation(fields: [trabajadorId], references: [id], onDelete: Cascade)
   fecha         DateTime   @default(now())
   incidencias   String     @db.Text
-  entregaA      String     // nombre de la persona a quien se entrega el puesto
-  puesto        String     // ubicacion/puesto donde ocurrieron las incidencias
+  entregaA      String     // nombre de la persona a quien se entrega el turno
+  ubicacion     String     @map("puesto") // ubicacion donde ocurrieron las incidencias
 
   @@index([trabajadorId, fecha])
 }

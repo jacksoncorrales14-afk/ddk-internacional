@@ -11,7 +11,7 @@ export function Navbar() {
   const role = session?.user?.role;
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-primary-100 bg-primary-700/95 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 border-b border-primary-100 bg-primary-700/95 backdrop-blur-md" aria-label="Navegacion principal">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
         <Link href="/" className="flex items-center gap-3">
           <Image src="/logo.png" alt="DDK Internacional" width={45} height={45} />

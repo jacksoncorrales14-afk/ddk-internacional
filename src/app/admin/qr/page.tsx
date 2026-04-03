@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { PUESTOS } from "@/types/models";
+import { UBICACIONES } from "@/types/models";
 
 export default function QRPage() {
   const { data: session, status } = useSession();
@@ -56,12 +56,12 @@ export default function QRPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Codigos QR por Puesto</h1>
-        <p className="text-sm text-gray-500">Genera e imprime los codigos QR para cada puesto. Los trabajadores deben escanearlos para marcar entrada y salida.</p>
+        <h1 className="text-3xl font-bold text-gray-900">Codigos QR por Ubicacion</h1>
+        <p className="text-sm text-gray-500">Genera e imprime los codigos QR para cada ubicacion. Los trabajadores deben escanearlos para marcar entrada y salida.</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {PUESTOS.map((puesto) => (
+        {UBICACIONES.map((puesto) => (
           <button
             key={puesto}
             onClick={() => generarQR(puesto)}

@@ -2,49 +2,52 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { RegistroAdmin, RondaAdmin, PUESTOS } from "@/types/models";
+import { useEffect, useState, useMemo } from "react";
+import { RegistroAdmin, UBICACIONES } from "@/types/models";
+import { useApiGet } from "@/hooks/useApi";
 
 interface BitacoraAdmin {
   id: string;
   fecha: string;
   incidencias: string;
   entregaA: string;
-  puesto: string;
+  ubicacion: string;
   trabajador: { nombre: string; cedula: string };
 }
 
 export default function RegistrosPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [registros, setRegistros] = useState<RegistroAdmin[]>([]);
-  const [rondas, setRondas] = useState<RondaAdmin[]>([]);
-  const [bitacoras, setBitacoras] = useState<BitacoraAdmin[]>([]);
-  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"registros" | "rondas" | "bitacoras">("registros");
   const [filtroPuesto, setFiltroPuesto] = useState("todos");
+
+  const isAdmin = session?.user?.role === "admin";
+  const { data: registros } = useApiGet<RegistroAdmin[]>(isAdmin ? "/api/admin/registros" : null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: rondas } = useApiGet<any[]>(isAdmin ? "/api/admin/rondas" : null);
+  const { data: bitacoras } = useApiGet<BitacoraAdmin[]>(isAdmin ? "/api/admin/bitacoras" : null);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
 
-  useEffect(() => {
-    if (session?.user?.role === "admin") {
-      Promise.all([
-        fetch("/api/admin/registros").then((r) => r.json()),
-        fetch("/api/admin/rondas").then((r) => r.json()),
-        fetch("/api/admin/bitacoras").then((r) => r.json()),
-      ])
-        .then(([reg, ron, bit]) => {
-          setRegistros(reg);
-          setRondas(ron);
-          setBitacoras(bit);
-        })
-        .finally(() => setLoading(false));
-    }
-  }, [session]);
+  const bitacorasFiltradas = useMemo(() =>
+    filtroPuesto === "todos"
+      ? (bitacoras || [])
+      : (bitacoras || []).filter((b) => b.ubicacion === filtroPuesto),
+    [bitacoras, filtroPuesto]
+  );
 
-  if (status === "loading" || loading) {
+  const bitacorasPorPuesto = useMemo(() =>
+    bitacorasFiltradas.reduce<Record<string, BitacoraAdmin[]>>((acc, b) => {
+      if (!acc[b.ubicacion]) acc[b.ubicacion] = [];
+      acc[b.ubicacion].push(b);
+      return acc;
+    }, {}),
+    [bitacorasFiltradas]
+  );
+
+  if (status === "loading" || !registros || !rondas || !bitacoras) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <p className="text-gray-400">Cargando...</p>
@@ -52,19 +55,7 @@ export default function RegistrosPage() {
     );
   }
 
-  if (session?.user?.role !== "admin") return null;
-
-  // Agrupar bitácoras por puesto
-  const bitacorasFiltradas = filtroPuesto === "todos"
-    ? bitacoras
-    : bitacoras.filter((b) => b.puesto === filtroPuesto);
-
-  // Agrupar por puesto para vista organizada
-  const bitacorasPorPuesto = bitacorasFiltradas.reduce<Record<string, BitacoraAdmin[]>>((acc, b) => {
-    if (!acc[b.puesto]) acc[b.puesto] = [];
-    acc[b.puesto].push(b);
-    return acc;
-  }, {});
+  if (!isAdmin) return null;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -140,39 +131,79 @@ export default function RegistrosPage() {
       )}
 
       {tab === "rondas" && (
-        <div className="card overflow-hidden p-0">
+        <div>
           {rondas.length === 0 ? (
-            <div className="p-8 text-center text-gray-400">No hay rondas registradas.</div>
+            <div className="card p-8 text-center text-gray-400">No hay rondas registradas.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                  <tr>
-                    <th className="px-6 py-3">Trabajador</th>
-                    <th className="px-6 py-3">Ubicacion</th>
-                    <th className="px-6 py-3">Fecha y Hora</th>
-                    <th className="px-6 py-3">Observaciones</th>
-                    <th className="px-6 py-3">Novedades</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {rondas.map((r) => (
-                    <tr key={r.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{r.trabajador.nombre}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{r.ubicacion}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{new Date(r.fecha).toLocaleString()}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{r.observaciones || "-"}</td>
-                      <td className="px-6 py-4">
-                        {r.novedades ? (
-                          <span className="text-sm font-medium text-red-600">{r.novedades}</span>
-                        ) : (
-                          <span className="text-sm text-gray-400">Sin novedades</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="space-y-4">
+              {rondas.map((r) => {
+                const puntosEscaneados = r.escaneos?.length || 0;
+                const total = r.totalPuntos || 0;
+                const progreso = total > 0 ? (puntosEscaneados / total) * 100 : 0;
+
+                return (
+                  <div key={r.id} className="card p-0 overflow-hidden">
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                      <div className="flex items-center gap-3">
+                        {/* Semaforo */}
+                        <span className={`inline-flex h-4 w-4 rounded-full ${
+                          r.completada ? "bg-green-500" : puntosEscaneados > 0 ? "bg-amber-500" : "bg-red-500"
+                        }`} />
+                        <div>
+                          <span className="text-sm font-medium text-gray-900">{r.trabajador.nombre}</span>
+                          <span className="ml-2 text-xs text-gray-400">({r.trabajador.cedula})</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                          r.completada ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                        }`}>
+                          {puntosEscaneados}/{total} puntos
+                        </span>
+                        <p className="text-xs text-gray-400 mt-0.5">{new Date(r.fecha).toLocaleString()}</p>
+                      </div>
+                    </div>
+
+                    {/* Barra de progreso */}
+                    <div className="px-6 py-2 bg-gray-50">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-gray-500 shrink-0">{r.ubicacion}</span>
+                        <div className="h-2 flex-1 rounded-full bg-gray-200 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${r.completada ? "bg-green-500" : "bg-amber-500"}`}
+                            style={{ width: `${progreso}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Detalle de escaneos */}
+                    {r.escaneos && r.escaneos.length > 0 && (
+                      <div className="px-6 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          {r.escaneos.map((e: { id: string; fecha: string; puntoRuta: { nombre: string } }) => (
+                            <span key={e.id} className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-xs text-green-700">
+                              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              {e.puntoRuta.nombre}
+                              <span className="text-green-500 ml-1">{new Date(e.fecha).toLocaleTimeString()}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Observaciones */}
+                    {(r.observaciones || r.novedades) && (
+                      <div className="px-6 py-3 border-t border-gray-100">
+                        {r.observaciones && <p className="text-xs text-gray-500">{r.observaciones}</p>}
+                        {r.novedades && <p className="text-xs font-medium text-red-600 mt-1">Novedad: {r.novedades}</p>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -180,7 +211,6 @@ export default function RegistrosPage() {
 
       {tab === "bitacoras" && (
         <div>
-          {/* Filtro por puesto */}
           <div className="mb-4 flex flex-wrap gap-2">
             <button
               onClick={() => setFiltroPuesto("todos")}
@@ -190,7 +220,7 @@ export default function RegistrosPage() {
             >
               Todos
             </button>
-            {PUESTOS.map((p) => (
+            {UBICACIONES.map((p) => (
               <button
                 key={p}
                 onClick={() => setFiltroPuesto(p)}

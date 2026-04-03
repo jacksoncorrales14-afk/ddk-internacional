@@ -2,10 +2,23 @@
 
 import { useState } from "react";
 
+function calcularEdad(fechaNacimiento: string): number | null {
+  if (!fechaNacimiento) return null;
+  const hoy = new Date();
+  const nacimiento = new Date(fechaNacimiento);
+  let edad = hoy.getFullYear() - nacimiento.getFullYear();
+  const mesActual = hoy.getMonth() - nacimiento.getMonth();
+  if (mesActual < 0 || (mesActual === 0 && hoy.getDate() < nacimiento.getDate())) {
+    edad--;
+  }
+  return edad;
+}
+
 export default function AplicarPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [fechaNacimiento, setFechaNacimiento] = useState("");
   const [archivoCV, setArchivoCV] = useState<File | null>(null);
   const [archivoDelincuencia, setArchivoDelincuencia] = useState<File | null>(null);
   const [archivoDocumento, setArchivoDocumento] = useState<File | null>(null);
@@ -115,6 +128,14 @@ export default function AplicarPage() {
             <input name="cedula" type="text" className="input-field" placeholder="Numero de documento" required />
           </div>
         </div>
+        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
+          <svg className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+          <p className="text-sm text-amber-800">
+            <span className="font-semibold">Importante:</span> Asegurese de seleccionar correctamente el tipo de documento de identificacion y que el numero coincida con el documento fisico. Datos incorrectos pueden retrasar o invalidar su solicitud.
+          </p>
+        </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -134,6 +155,31 @@ export default function AplicarPage() {
             Direccion Exacta <span className="text-red-500">*</span>
           </label>
           <input name="direccion" type="text" className="input-field" placeholder="Provincia, canton, distrito, senas exactas" required />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Fecha de Nacimiento <span className="text-red-500">*</span>
+            </label>
+            <input
+              name="fechaNacimiento"
+              type="date"
+              className="input-field"
+              value={fechaNacimiento}
+              onChange={(e) => setFechaNacimiento(e.target.value)}
+              max={new Date().toISOString().split("T")[0]}
+              required
+            />
+          </div>
+          <div className="flex items-end">
+            {fechaNacimiento && (
+              <div className="w-full rounded-lg bg-primary-50 border border-primary-200 px-4 py-2.5 text-center">
+                <span className="text-sm text-primary-600">Edad: </span>
+                <span className="text-lg font-bold text-primary-800">{calcularEdad(fechaNacimiento)} anos</span>
+              </div>
+            )}
+          </div>
         </div>
 
         <div>
@@ -223,6 +269,14 @@ export default function AplicarPage() {
         <p className="text-sm text-gray-500 mb-4">
           Sube los siguientes documentos en formato PDF, JPG o PNG.
         </p>
+        <div className="flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 p-3 mb-4">
+          <svg className="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+          <p className="text-sm text-red-800">
+            <span className="font-semibold">Obligatorio:</span> La <span className="font-semibold">Hoja de Delincuencia</span> y la <span className="font-semibold">Copia del Documento de Identificacion</span> son requisitos indispensables para que su solicitud sea tomada en cuenta.
+          </p>
+        </div>
 
         <div className="space-y-4">
           <div className="rounded-lg border border-gray-200 p-4">

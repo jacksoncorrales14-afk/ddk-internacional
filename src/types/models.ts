@@ -36,7 +36,11 @@ export interface Trabajador {
   puesto: string;
   ubicacion: string;
   activo: boolean;
+  activado: boolean;
+  codigoActivacion: string | null;
+  biometriaRegistrada: boolean;
   enServicio: boolean;
+  ubicacionActual: string | null;
   diasTrabajados: number;
   horasTotales: number;
   createdAt: string;
@@ -71,10 +75,10 @@ export interface Bitacora {
   fecha: string;
   incidencias: string;
   entregaA: string;
-  puesto: string;
+  ubicacion: string;
 }
 
-export const PUESTOS = [
+export const UBICACIONES = [
   "Jacaranda",
   "Malinches",
   "Parques del Sol (Finca Madre)",
@@ -84,6 +88,9 @@ export const PUESTOS = [
   "City Place Santa Ana",
   "Fuerte Ventura",
 ];
+
+/** @deprecated Usar UBICACIONES */
+export const PUESTOS = UBICACIONES;
 
 // Scoring y medallas
 export type Medalla = "oro" | "plata" | "bronce";

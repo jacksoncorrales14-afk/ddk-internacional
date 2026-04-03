@@ -3,7 +3,12 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Candidato, calcularPuntaje, getMedalla } from "@/types/models";
+import { Candidato, Medalla } from "@/types/models";
+
+interface CandidatoRankeado extends Candidato {
+  puntaje: number;
+  medalla: Medalla;
+}
 
 const medallaConfig = {
   oro: {
@@ -39,7 +44,7 @@ function formatPhone(telefono: string): string {
 export default function EmergenciaPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [candidatos, setCandidatos] = useState<Candidato[]>([]);
+  const [candidatos, setCandidatos] = useState<CandidatoRankeado[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroPuesto, setFiltroPuesto] = useState("todos");
 
@@ -47,20 +52,20 @@ export default function EmergenciaPage() {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
 
+  const fetchEmergencia = (puesto: string) => {
+    setLoading(true);
+    const params = puesto !== "todos" ? `?puesto=${puesto}` : "";
+    fetch(`/api/admin/emergencia${params}`)
+      .then((r) => r.json())
+      .then(setCandidatos)
+      .finally(() => setLoading(false));
+  };
+
   useEffect(() => {
     if (session?.user?.role === "admin") {
-      fetch("/api/candidatos")
-        .then((r) => r.json())
-        .then((data: Candidato[]) => {
-          // Ordenar por puntaje descendente
-          const sorted = data
-            .filter((c) => c.estado !== "rechazado")
-            .sort((a, b) => calcularPuntaje(b) - calcularPuntaje(a));
-          setCandidatos(sorted);
-        })
-        .finally(() => setLoading(false));
+      fetchEmergencia(filtroPuesto);
     }
-  }, [session]);
+  }, [session, filtroPuesto]);
 
   if (status === "loading" || loading) {
     return (
@@ -71,10 +76,6 @@ export default function EmergenciaPage() {
   }
 
   if (session?.user?.role !== "admin") return null;
-
-  const filtrados = filtroPuesto === "todos"
-    ? candidatos
-    : candidatos.filter((c) => c.puesto === filtroPuesto);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
@@ -125,14 +126,12 @@ export default function EmergenciaPage() {
       </div>
 
       {/* Lista de candidatos */}
-      {filtrados.length === 0 ? (
+      {candidatos.length === 0 ? (
         <div className="card py-16 text-center text-gray-400">No hay candidatos disponibles.</div>
       ) : (
         <div className="space-y-4">
-          {filtrados.map((c, index) => {
-            const medalla = getMedalla(c);
-            const config = medallaConfig[medalla];
-            const puntaje = calcularPuntaje(c);
+          {candidatos.map((c, index) => {
+            const config = medallaConfig[c.medalla];
             const phoneClean = formatPhone(c.telefono);
 
             return (
@@ -160,7 +159,7 @@ export default function EmergenciaPage() {
                       <p className="mt-1 text-sm text-gray-500">
                         {c.aniosExperiencia} año{c.aniosExperiencia !== 1 ? "s" : ""} de experiencia
                         {" | "}{c.atestados.length} documento{c.atestados.length !== 1 ? "s" : ""}
-                        {" | "}Puntaje: {puntaje}
+                        {" | "}Puntaje: {c.puntaje}
                       </p>
 
                       {/* Certificaciones */}

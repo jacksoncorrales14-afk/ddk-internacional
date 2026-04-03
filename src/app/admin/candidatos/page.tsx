@@ -2,8 +2,18 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Candidato, tipoDocLabels } from "@/types/models";
+import CandidatoModal from "@/components/admin/CandidatoModal";
+import Paginacion from "@/components/Paginacion";
+
+interface PaginatedResponse {
+  data: Candidato[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
 
 export default function CandidatosPage() {
   const { data: session, status } = useSession();
@@ -12,21 +22,45 @@ export default function CandidatosPage() {
   const [loading, setLoading] = useState(true);
   const [detalle, setDetalle] = useState<Candidato | null>(null);
   const [filtro, setFiltro] = useState("todos");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
 
+  const fetchCandidatos = useCallback((currentPage: number, estado: string) => {
+    setLoading(true);
+    const params = new URLSearchParams({
+      page: currentPage.toString(),
+      limit: limit.toString(),
+    });
+    if (estado !== "todos") params.set("estado", estado);
+
+    fetch(`/api/candidatos?${params}`)
+      .then((r) => r.json())
+      .then((res: PaginatedResponse) => {
+        setCandidatos(res.data);
+        setTotalPages(res.totalPages);
+        setTotal(res.total);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
   useEffect(() => {
     if (session?.user?.role === "admin") {
-      fetch("/api/candidatos")
-        .then((r) => r.json())
-        .then(setCandidatos)
-        .finally(() => setLoading(false));
+      fetchCandidatos(page, filtro);
     }
-  }, [session]);
+  }, [session, page, filtro, fetchCandidatos]);
 
-  const actualizarEstado = async (id: string, estado: string) => {
+  const cambiarFiltro = (nuevoFiltro: string) => {
+    setFiltro(nuevoFiltro);
+    setPage(1);
+  };
+
+  const actualizarEstado = useCallback(async (id: string, estado: string) => {
     if (estado === "rechazado" && !confirm("¿Estas seguro de rechazar este candidato?")) return;
     await fetch(`/api/candidatos/${id}`, {
       method: "PATCH",
@@ -36,8 +70,8 @@ export default function CandidatosPage() {
     setCandidatos((prev) =>
       prev.map((c) => (c.id === id ? { ...c, estado } : c))
     );
-    if (detalle?.id === id) setDetalle({ ...detalle, estado });
-  };
+    setDetalle((prev) => prev?.id === id ? { ...prev, estado } : prev);
+  }, []);
 
   if (status === "loading" || loading) {
     return (
@@ -49,14 +83,12 @@ export default function CandidatosPage() {
 
   if (session?.user?.role !== "admin") return null;
 
-  const filtrados = filtro === "todos" ? candidatos : candidatos.filter((c) => c.estado === filtro);
-
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Candidatos</h1>
-          <p className="text-sm text-gray-500">{candidatos.length} solicitudes recibidas</p>
+          <p className="text-sm text-gray-500">{total} solicitudes recibidas</p>
         </div>
       </div>
 
@@ -65,7 +97,7 @@ export default function CandidatosPage() {
         {["todos", "pendiente", "aprobado", "rechazado"].map((f) => (
           <button
             key={f}
-            onClick={() => setFiltro(f)}
+            onClick={() => cambiarFiltro(f)}
             className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               filtro === f ? "bg-primary-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
@@ -75,76 +107,17 @@ export default function CandidatosPage() {
         ))}
       </div>
 
-      {/* Detalle modal */}
       {detalle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">{detalle.nombre}</h2>
-              <button onClick={() => setDetalle(null)} className="text-gray-400 hover:text-gray-600" aria-label="Cerrar">
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="mb-6 grid gap-3 sm:grid-cols-2">
-              <div><span className="text-xs text-gray-500">{tipoDocLabels[detalle.tipoDocumento] || "Documento"}:</span><p className="font-medium">{detalle.cedula}</p></div>
-              <div><span className="text-xs text-gray-500">Email:</span><p className="font-medium">{detalle.email}</p></div>
-              <div><span className="text-xs text-gray-500">Telefono:</span><p className="font-medium">{detalle.telefono}</p></div>
-              <div><span className="text-xs text-gray-500">Puesto:</span><p className="font-medium capitalize">{detalle.puesto}</p></div>
-              <div className="sm:col-span-2"><span className="text-xs text-gray-500">Direccion:</span><p className="font-medium">{detalle.direccion}</p></div>
-              {detalle.licenciaConducir && (
-                <div><span className="text-xs text-gray-500">Licencia de Conducir:</span><p className="font-medium">{detalle.licenciaConducir}</p></div>
-              )}
-              {detalle.experiencia && (
-                <div className="sm:col-span-2"><span className="text-xs text-gray-500">Experiencia:</span><p className="font-medium">{detalle.experiencia}</p></div>
-              )}
-              {detalle.disponibilidad && (
-                <div><span className="text-xs text-gray-500">Disponibilidad:</span><p className="font-medium">{detalle.disponibilidad}</p></div>
-              )}
-              <div><span className="text-xs text-gray-500">Fecha:</span><p className="font-medium">{new Date(detalle.createdAt).toLocaleDateString()}</p></div>
-            </div>
-
-            {/* Atestados */}
-            <h3 className="mb-3 text-lg font-bold text-gray-900">Atestados ({detalle.atestados.length})</h3>
-            {detalle.atestados.length === 0 ? (
-              <p className="text-sm text-gray-400">No adjunto documentos</p>
-            ) : (
-              <div className="mb-6 space-y-2">
-                {detalle.atestados.map((a) => (
-                  <a
-                    key={a.id}
-                    href={a.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 rounded-lg border border-gray-200 p-3 text-sm text-primary-600 transition-colors hover:bg-primary-50"
-                  >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    {a.nombre}
-                  </a>
-                ))}
-              </div>
-            )}
-
-            {/* Acciones */}
-            <div className="flex gap-3">
-              <button onClick={() => actualizarEstado(detalle.id, "aprobado")} className="btn-primary flex-1">
-                Aprobar
-              </button>
-              <button onClick={() => actualizarEstado(detalle.id, "rechazado")} className="btn-danger flex-1">
-                Rechazar
-              </button>
-            </div>
-          </div>
-        </div>
+        <CandidatoModal
+          candidato={detalle}
+          onClose={() => setDetalle(null)}
+          onActualizarEstado={actualizarEstado}
+        />
       )}
 
       {/* Tabla */}
       <div className="card overflow-hidden p-0">
-        {filtrados.length === 0 ? (
+        {candidatos.length === 0 ? (
           <div className="p-8 text-center text-gray-400">No hay candidatos en esta categoria.</div>
         ) : (
           <div className="overflow-x-auto">
@@ -161,7 +134,7 @@ export default function CandidatosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filtrados.map((c) => (
+                {candidatos.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{c.nombre}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">
@@ -192,6 +165,13 @@ export default function CandidatosPage() {
           </div>
         )}
       </div>
+
+      <Paginacion
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

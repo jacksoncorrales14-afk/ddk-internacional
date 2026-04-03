@@ -1,20 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { supabase } from "@/lib/supabase";
+import {
+  listarCandidatos,
+  crearCandidato,
+  subirAtestados,
+} from "@/services/candidato.service";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.role || session.user.role !== "admin") {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const candidatos = await prisma.candidato.findMany({
-    include: { atestados: true },
-    orderBy: { createdAt: "desc" },
-  });
-  return NextResponse.json(candidatos);
+  const { searchParams } = new URL(req.url);
+  const page = parseInt(searchParams.get("page") || "1");
+  const limit = parseInt(searchParams.get("limit") || "20");
+  const estado = searchParams.get("estado") || undefined;
+  const puesto = searchParams.get("puesto") || undefined;
+
+  const result = await listarCandidatos({ page, limit, estado, puesto });
+  return NextResponse.json(result);
 }
 
 export async function POST(req: NextRequest) {
@@ -34,57 +40,23 @@ export async function POST(req: NextRequest) {
     const portacionArma = formData.get("portacionArma") === "true";
     const licenciaConducir = (formData.get("licenciaConducir") as string) || null;
     const cursoBasicoPolicial = formData.get("cursoBasicoPolicial") === "true";
+    const fechaNacimientoStr = formData.get("fechaNacimiento") as string;
+    const fechaNacimiento = fechaNacimientoStr ? new Date(fechaNacimientoStr) : undefined;
 
     if (!nombre || !cedula || !email || !telefono || !direccion || !puesto) {
       return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
     }
 
-    // Verificar documento unico
-    const existe = await prisma.candidato.findUnique({ where: { cedula } });
-    if (existe) {
-      return NextResponse.json({ error: "Ya existe una solicitud con este numero de documento" }, { status: 400 });
-    }
-
-    // Crear candidato
-    const candidato = await prisma.candidato.create({
-      data: {
-        nombre, tipoDocumento, cedula, email, telefono, direccion, puesto,
-        experiencia, disponibilidad, aniosExperiencia,
-        portacionArma, licenciaConducir, cursoBasicoPolicial,
-      },
+    const candidato = await crearCandidato({
+      nombre, tipoDocumento, cedula, email, telefono, direccion, puesto,
+      experiencia, disponibilidad, aniosExperiencia,
+      portacionArma, licenciaConducir, cursoBasicoPolicial, fechaNacimiento,
     });
 
-    // Subir archivos con sus tipos
+    // Subir archivos en paralelo
     const archivos = formData.getAll("archivos") as File[];
     const tiposArchivo = formData.getAll("tiposArchivo") as string[];
-
-    for (let i = 0; i < archivos.length; i++) {
-      const archivo = archivos[i];
-      if (archivo.size === 0) continue;
-
-      const tipo = tiposArchivo[i] || "otro";
-      const buffer = Buffer.from(await archivo.arrayBuffer());
-      const fileName = `${candidato.id}/${Date.now()}-${archivo.name}`;
-
-      const { error } = await supabase.storage
-        .from("atestados")
-        .upload(fileName, buffer, { contentType: archivo.type });
-
-      if (!error) {
-        const { data: urlData } = supabase.storage
-          .from("atestados")
-          .getPublicUrl(fileName);
-
-        await prisma.atestado.create({
-          data: {
-            nombre: archivo.name,
-            url: urlData.publicUrl,
-            tipo,
-            candidatoId: candidato.id,
-          },
-        });
-      }
-    }
+    await subirAtestados(candidato.id, archivos, tiposArchivo);
 
     return NextResponse.json(candidato, { status: 201 });
   } catch (error) {

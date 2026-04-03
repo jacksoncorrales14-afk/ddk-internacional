@@ -4,6 +4,7 @@ import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,10 +17,6 @@ export default function LoginPage() {
   // Admin fields
   const [identificacion, setIdentificacion] = useState("");
   const [password, setPassword] = useState("");
-
-  // Trabajador fields
-  const [cedula, setCedula] = useState("");
-  const [passT, setPassT] = useState("");
 
   const handleAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,24 +63,45 @@ export default function LoginPage() {
     setRecuperando(false);
   };
 
-  const handleTrabajador = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleBiometrico = async () => {
     setError("");
     setLoading(true);
+    try {
+      const { startAuthentication } = await import("@simplewebauthn/browser");
 
-    const result = await signIn("trabajador-login", {
-      cedula,
-      password: passT,
-      redirect: false,
-    });
+      const optionsRes = await fetch("/api/webauthn/login");
+      const options = await optionsRes.json();
 
-    setLoading(false);
-    if (result?.error) {
-      setError("Cedula o contraseña incorrecta");
-    } else {
-      router.push("/trabajador");
-      router.refresh();
+      const authResp = await startAuthentication({ optionsJSON: options });
+
+      const verifyRes = await fetch("/api/webauthn/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(authResp),
+      });
+
+      const verifyData = await verifyRes.json();
+
+      if (verifyRes.ok && verifyData.success) {
+        const result = await signIn("trabajador-login", {
+          cedula: verifyData.trabajador.cedula,
+          biometricVerified: "true",
+          redirect: false,
+        });
+
+        if (result?.error) {
+          setError("Error al iniciar sesion biometrica");
+        } else {
+          router.push("/trabajador");
+          router.refresh();
+        }
+      } else {
+        setError(verifyData.error || "Autenticacion biometrica fallida");
+      }
+    } catch {
+      setError("No se pudo completar la autenticacion biometrica. Verifica que tu dispositivo lo soporte.");
     }
+    setLoading(false);
   };
 
   return (
@@ -120,33 +138,34 @@ export default function LoginPage() {
           )}
 
           {tab === "trabajador" ? (
-            <form onSubmit={handleTrabajador} className="space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Cedula</label>
-                <input
-                  type="text"
-                  value={cedula}
-                  onChange={(e) => setCedula(e.target.value)}
-                  className="input-field"
-                  placeholder="Tu numero de cedula"
-                  required
-                />
+            <div className="space-y-4">
+              <div className="rounded-lg bg-primary-50 border border-primary-200 p-4 text-center">
+                <svg className="mx-auto mb-3 h-12 w-12 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                </svg>
+                <p className="text-sm text-primary-800 mb-1">
+                  Usa tu <span className="font-semibold">Face ID</span> o <span className="font-semibold">huella dactilar</span> para ingresar
+                </p>
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Contraseña</label>
-                <input
-                  type="password"
-                  value={passT}
-                  onChange={(e) => setPassT(e.target.value)}
-                  className="input-field"
-                  placeholder="Tu contraseña"
-                  required
-                />
-              </div>
-              <button type="submit" className="btn-primary w-full" disabled={loading}>
-                {loading ? "Ingresando..." : "Ingresar"}
+
+              <button
+                type="button"
+                onClick={handleBiometrico}
+                disabled={loading}
+                className="btn-primary w-full flex items-center justify-center gap-2 py-3"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                </svg>
+                {loading ? "Verificando..." : "Ingresar con Biometria"}
               </button>
-            </form>
+
+              <div className="text-center">
+                <Link href="/activar" className="text-sm text-primary-600 hover:text-primary-800">
+                  Primera vez? Activar mi cuenta
+                </Link>
+              </div>
+            </div>
           ) : (
             <form onSubmit={handleAdmin} className="space-y-4">
               <div>

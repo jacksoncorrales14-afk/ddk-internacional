@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { validarCodigoQR } from "@/lib/qr";
+import {
+  listarRegistrosTrabajador,
+  crearRegistro,
+} from "@/services/registro.service";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -10,12 +12,7 @@ export async function GET() {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const registros = await prisma.registroHorario.findMany({
-    where: { trabajadorId: session.user.id },
-    orderBy: { fecha: "desc" },
-    take: 50,
-  });
-
+  const registros = await listarRegistrosTrabajador(session.user.id);
   return NextResponse.json(registros);
 }
 
@@ -25,30 +22,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const { tipo, nota, codigoQR } = await req.json();
-
-  if (!tipo || !["entrada", "salida"].includes(tipo)) {
-    return NextResponse.json({ error: "Tipo invalido" }, { status: 400 });
-  }
-
-  if (!codigoQR) {
-    return NextResponse.json({ error: "Debe escanear el codigo QR del puesto" }, { status: 400 });
-  }
-
-  // Validar código QR
-  const { valid, puesto } = validarCodigoQR(codigoQR);
-  if (!valid) {
-    return NextResponse.json({ error: "Codigo QR invalido" }, { status: 400 });
-  }
-
-  const registro = await prisma.registroHorario.create({
-    data: {
+  try {
+    const { tipo, nota, codigoQR } = await req.json();
+    const registro = await crearRegistro({
       trabajadorId: session.user.id,
       tipo,
-      ubicacion: puesto,
-      nota: nota || null,
-    },
-  });
-
-  return NextResponse.json(registro, { status: 201 });
+      nota,
+      codigoQR,
+    });
+    return NextResponse.json(registro, { status: 201 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Error desconocido";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import {
+  listarBitacorasTrabajador,
+  crearBitacora,
+} from "@/services/registro.service";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -9,12 +12,7 @@ export async function GET() {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const bitacoras = await prisma.bitacora.findMany({
-    where: { trabajadorId: session.user.id },
-    orderBy: { fecha: "desc" },
-    take: 50,
-  });
-
+  const bitacoras = await listarBitacorasTrabajador(session.user.id);
   return NextResponse.json(bitacoras);
 }
 
@@ -24,20 +22,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const { incidencias, entregaA, puesto } = await req.json();
-
-  if (!incidencias || !entregaA || !puesto) {
-    return NextResponse.json({ error: "Todos los campos son requeridos" }, { status: 400 });
-  }
-
-  const bitacora = await prisma.bitacora.create({
-    data: {
+  try {
+    const { incidencias, entregaA, ubicacion } = await req.json();
+    const bitacora = await crearBitacora({
       trabajadorId: session.user.id,
       incidencias,
       entregaA,
-      puesto,
-    },
-  });
-
-  return NextResponse.json(bitacora, { status: 201 });
+      ubicacion,
+    });
+    return NextResponse.json(bitacora, { status: 201 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Error desconocido";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }

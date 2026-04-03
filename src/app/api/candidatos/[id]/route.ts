@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { actualizarEstadoCandidato } from "@/services/candidato.service";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -10,11 +10,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const { estado } = await req.json();
-
-  const candidato = await prisma.candidato.update({
-    where: { id: params.id },
-    data: { estado },
-  });
-
+  const candidato = await actualizarEstadoCandidato(params.id, estado);
   return NextResponse.json(candidato);
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { obtenerStatsAdmin } from "@/services/registro.service";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -9,14 +9,6 @@ export async function GET() {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-
-  const [candidatos, trabajadores, registrosHoy] = await Promise.all([
-    prisma.candidato.count(),
-    prisma.trabajador.count({ where: { activo: true } }),
-    prisma.registroHorario.count({ where: { fecha: { gte: hoy } } }),
-  ]);
-
-  return NextResponse.json({ candidatos, trabajadores, registrosHoy });
+  const stats = await obtenerStatsAdmin();
+  return NextResponse.json(stats);
 }

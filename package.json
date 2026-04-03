@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.0",
     "@supabase/supabase-js": "^2.100.0",
     "bcryptjs": "^3.0.3",
     "html5-qrcode": "^2.3.8",
@@ -19,7 +21,8 @@
     "nodemailer": "^7.0.13",
     "qrcode": "^1.5.4",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "swr": "^2.4.1"
   },
   "prisma": {
     "seed": "npx ts-node prisma/seed.ts"
