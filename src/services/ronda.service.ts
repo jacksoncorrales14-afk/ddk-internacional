@@ -143,8 +143,27 @@ export async function listarRondasTrabajador(trabajadorId: string) {
   });
 }
 
-export async function listarRondasAdmin() {
+export interface FiltrosRondas {
+  desde?: Date;
+  hasta?: Date;
+  trabajadorId?: string;
+  ubicacion?: string;
+  limit?: number;
+}
+
+export async function listarRondasAdmin(filtros: FiltrosRondas = {}) {
+  const where: Record<string, unknown> = {};
+  if (filtros.trabajadorId) where.trabajadorId = filtros.trabajadorId;
+  if (filtros.ubicacion) where.ubicacion = filtros.ubicacion;
+  if (filtros.desde || filtros.hasta) {
+    const fecha: Record<string, Date> = {};
+    if (filtros.desde) fecha.gte = filtros.desde;
+    if (filtros.hasta) fecha.lte = filtros.hasta;
+    where.fecha = fecha;
+  }
+
   return prisma.ronda.findMany({
+    where,
     include: {
       trabajador: { select: { nombre: true, cedula: true } },
       escaneos: {
@@ -153,6 +172,6 @@ export async function listarRondasAdmin() {
       },
     },
     orderBy: { fecha: "desc" },
-    take: 100,
+    take: filtros.limit || 500,
   });
 }

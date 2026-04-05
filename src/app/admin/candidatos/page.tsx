@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Candidato, tipoDocLabels } from "@/types/models";
 import CandidatoModal from "@/components/admin/CandidatoModal";
 import Paginacion from "@/components/Paginacion";
+import BuscadorTexto from "@/components/admin/BuscadorTexto";
 
 interface PaginatedResponse {
   data: Candidato[];
@@ -22,6 +23,7 @@ export default function CandidatosPage() {
   const [loading, setLoading] = useState(true);
   const [detalle, setDetalle] = useState<Candidato | null>(null);
   const [filtro, setFiltro] = useState("todos");
+  const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -31,13 +33,14 @@ export default function CandidatosPage() {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
 
-  const fetchCandidatos = useCallback((currentPage: number, estado: string) => {
+  const fetchCandidatos = useCallback((currentPage: number, estado: string, query: string) => {
     setLoading(true);
     const params = new URLSearchParams({
       page: currentPage.toString(),
       limit: limit.toString(),
     });
     if (estado !== "todos") params.set("estado", estado);
+    if (query.trim()) params.set("q", query.trim());
 
     fetch(`/api/candidatos?${params}`)
       .then((r) => r.json())
@@ -51,26 +54,45 @@ export default function CandidatosPage() {
 
   useEffect(() => {
     if (session?.user?.role === "admin") {
-      fetchCandidatos(page, filtro);
+      fetchCandidatos(page, filtro, q);
     }
-  }, [session, page, filtro, fetchCandidatos]);
+  }, [session, page, filtro, q, fetchCandidatos]);
 
   const cambiarFiltro = (nuevoFiltro: string) => {
     setFiltro(nuevoFiltro);
     setPage(1);
   };
 
-  const actualizarEstado = useCallback(async (id: string, estado: string) => {
-    if (estado === "rechazado" && !confirm("¿Estas seguro de rechazar este candidato?")) return;
+  const aprobarCandidato = useCallback(async (
+    id: string,
+    datos: { ubicacion: string; horaInicio?: string; horaFin?: string; diasSemana?: string; toleranciaMin?: number }
+  ) => {
+    const res = await fetch(`/api/candidatos/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado: "aprobado", ...datos }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Error al aprobar");
+    }
+    const data = await res.json();
+    setCandidatos((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, estado: "aprobado" } : c))
+    );
+    setDetalle((prev) => (prev?.id === id ? { ...prev, estado: "aprobado" } : prev));
+    return { codigoActivacion: data.codigoActivacion };
+  }, []);
+
+  const rechazarCandidato = useCallback(async (id: string) => {
     await fetch(`/api/candidatos/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ estado }),
+      body: JSON.stringify({ estado: "rechazado" }),
     });
     setCandidatos((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, estado } : c))
+      prev.map((c) => (c.id === id ? { ...c, estado: "rechazado" } : c))
     );
-    setDetalle((prev) => prev?.id === id ? { ...prev, estado } : prev);
   }, []);
 
   if (status === "loading" || loading) {
@@ -85,15 +107,22 @@ export default function CandidatosPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Candidatos</h1>
           <p className="text-sm text-gray-500">{total} solicitudes recibidas</p>
         </div>
+        <BuscadorTexto
+          value={q}
+          onChange={(value) => {
+            setQ(value);
+            setPage(1);
+          }}
+        />
       </div>
 
       {/* Filtros */}
-      <div className="mb-6 flex gap-2">
+      <div className="mb-6 flex flex-wrap gap-2">
         {["todos", "pendiente", "aprobado", "rechazado"].map((f) => (
           <button
             key={f}
@@ -111,7 +140,8 @@ export default function CandidatosPage() {
         <CandidatoModal
           candidato={detalle}
           onClose={() => setDetalle(null)}
-          onActualizarEstado={actualizarEstado}
+          onAprobar={aprobarCandidato}
+          onRechazar={rechazarCandidato}
         />
       )}
 

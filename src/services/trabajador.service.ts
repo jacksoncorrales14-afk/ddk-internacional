@@ -3,8 +3,19 @@ import { nanoid } from "nanoid";
 
 // ─── Queries ───
 
-export async function listarTrabajadoresConStats() {
+export async function listarTrabajadoresConStats(q?: string) {
+  const where: Record<string, unknown> = {};
+  if (q && q.trim()) {
+    const term = q.trim();
+    where.OR = [
+      { nombre: { contains: term, mode: "insensitive" } },
+      { cedula: { contains: term } },
+      { email: { contains: term, mode: "insensitive" } },
+    ];
+  }
+
   const trabajadores = await prisma.trabajador.findMany({
+    where,
     orderBy: { createdAt: "desc" },
     include: { _count: { select: { credenciales: true } } },
   });
@@ -64,6 +75,10 @@ export async function listarTrabajadoresConStats() {
     activo: t.activo,
     activado: t.activado,
     codigoActivacion: t.codigoActivacion,
+    horaInicio: t.horaInicio,
+    horaFin: t.horaFin,
+    diasSemana: t.diasSemana,
+    toleranciaMin: t.toleranciaMin,
     biometriaRegistrada: t._count.credenciales > 0,
     createdAt: t.createdAt,
     enServicio: ultimoMap.get(t.id)?.tipo === "entrada",
@@ -84,11 +99,27 @@ export async function crearTrabajador(data: {
   telefono: string;
   puesto: string;
   ubicacion: string;
+  horaInicio?: string | null;
+  horaFin?: string | null;
+  diasSemana?: string | null;
+  toleranciaMin?: number;
 }) {
   const codigoActivacion = generarCodigoActivacion();
 
   return prisma.trabajador.create({
-    data: { ...data, codigoActivacion },
+    data: {
+      nombre: data.nombre,
+      cedula: data.cedula,
+      email: data.email,
+      telefono: data.telefono,
+      puesto: data.puesto,
+      ubicacion: data.ubicacion,
+      horaInicio: data.horaInicio || null,
+      horaFin: data.horaFin || null,
+      diasSemana: data.diasSemana || null,
+      toleranciaMin: data.toleranciaMin ?? 15,
+      codigoActivacion,
+    },
   });
 }
 
@@ -130,4 +161,84 @@ export async function actualizarTrabajador(
     where: { id },
     data,
   });
+}
+
+// ─── Deteccion de ausencias ───
+
+function minutosDesdeHora(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+
+/**
+ * Detecta trabajadores que deberian estar trabajando (segun horario) pero no han marcado entrada hoy.
+ * Crea una notificacion por cada uno, sin duplicar si ya existe una para hoy.
+ */
+export async function detectarAusencias() {
+  const ahora = new Date();
+  const diaSemana = ahora.getDay() === 0 ? "7" : String(ahora.getDay()); // 1..7 lun..dom
+  const minutosActuales = ahora.getHours() * 60 + ahora.getMinutes();
+
+  const inicioDia = new Date(ahora);
+  inicioDia.setHours(0, 0, 0, 0);
+
+  // Trabajadores activos con horario definido
+  const trabajadores = await prisma.trabajador.findMany({
+    where: {
+      activo: true,
+      horaInicio: { not: null },
+    },
+  });
+
+  const ausentes: { id: string; nombre: string; ubicacion: string }[] = [];
+
+  for (const t of trabajadores) {
+    if (!t.horaInicio) continue;
+    // Verificar si hoy es un dia laboral para este trabajador
+    const dias = (t.diasSemana || "").split(",").filter(Boolean);
+    if (dias.length > 0 && !dias.includes(diaSemana)) continue;
+
+    const horaInicioMin = minutosDesdeHora(t.horaInicio);
+    const limite = horaInicioMin + (t.toleranciaMin ?? 15);
+
+    // Solo evaluamos despues de la hora de inicio + tolerancia
+    if (minutosActuales < limite) continue;
+
+    // Verificar si ya marco entrada hoy
+    const entradaHoy = await prisma.registroHorario.findFirst({
+      where: {
+        trabajadorId: t.id,
+        tipo: "entrada",
+        fecha: { gte: inicioDia },
+      },
+    });
+
+    if (!entradaHoy) {
+      ausentes.push({ id: t.id, nombre: t.nombre, ubicacion: t.ubicacion });
+    }
+  }
+
+  // Crear notificaciones (sin duplicados del mismo dia)
+  const link = "/admin/trabajadores";
+  for (const a of ausentes) {
+    const ya = await prisma.notificacion.findFirst({
+      where: {
+        tipo: "trabajador_ausente",
+        mensaje: { contains: a.nombre },
+        createdAt: { gte: inicioDia },
+      },
+    });
+    if (!ya) {
+      await prisma.notificacion.create({
+        data: {
+          tipo: "trabajador_ausente",
+          titulo: "Trabajador ausente",
+          mensaje: `${a.nombre} no ha marcado entrada hoy en ${a.ubicacion}.`,
+          link,
+        },
+      });
+    }
+  }
+
+  return { ausentes: ausentes.length, detalle: ausentes };
 }

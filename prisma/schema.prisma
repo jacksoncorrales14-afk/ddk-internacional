@@ -65,6 +65,11 @@ model Trabajador {
   password          String?  // deprecated - se mantiene por compatibilidad
   codigoActivacion  String?  @unique // codigo temporal para registro biometrico
   activado          Boolean  @default(false) // true cuando ya registro biometria
+  // Horario laboral (para deteccion de ausencias)
+  horaInicio        String?  // "06:00"
+  horaFin           String?  // "18:00"
+  diasSemana        String?  // CSV "1,2,3,4,5" (1=lunes, 7=domingo)
+  toleranciaMin     Int      @default(15)
   createdAt         DateTime @default(now())
 
   registros    RegistroHorario[]
@@ -151,4 +156,30 @@ model Bitacora {
   ubicacion     String     @map("puesto") // ubicacion donde ocurrieron las incidencias
 
   @@index([trabajadorId, fecha])
+}
+
+model Notificacion {
+  id        String   @id @default(cuid())
+  tipo      String   // "candidato_nuevo" | "ronda_incompleta" | "trabajador_ausente" | "trabajador_creado"
+  titulo    String
+  mensaje   String   @db.Text
+  link      String?  // ruta interna opcional, e.g. "/admin/candidatos"
+  leida     Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([leida, createdAt])
+}
+
+model AuditoriaLog {
+  id          String   @id @default(cuid())
+  adminId     String
+  adminNombre String   // snapshot para no perder el nombre si el admin se elimina
+  accion      String   // e.g. "candidato_aprobado", "trabajador_creado"
+  entidad     String   // "Candidato" | "Trabajador"
+  entidadId   String?
+  detalle     String?  @db.Text // JSON string con contexto adicional
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([adminId])
 }

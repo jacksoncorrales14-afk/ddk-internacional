@@ -3,8 +3,14 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
-import { RegistroAdmin, UBICACIONES } from "@/types/models";
+import { RegistroAdmin } from "@/types/models";
 import { useApiGet } from "@/hooks/useApi";
+import FiltroFechas, {
+  FiltrosState,
+  filtrosIniciales,
+  buildFiltrosQuery,
+} from "@/components/admin/FiltroFechas";
+import AcordeonPuesto from "@/components/admin/AcordeonPuesto";
 
 interface BitacoraAdmin {
   id: string;
@@ -15,39 +21,191 @@ interface BitacoraAdmin {
   trabajador: { nombre: string; cedula: string };
 }
 
+interface RondaAdmin {
+  id: string;
+  fecha: string;
+  ubicacion: string;
+  observaciones: string | null;
+  novedades: string | null;
+  completada: boolean;
+  totalPuntos: number;
+  escaneos: { id: string; fecha: string; puntoRuta: { nombre: string; orden: number } }[];
+  trabajador: { nombre: string; cedula: string };
+}
+
+// ─── Utilidades de formato ───
+
+function formatHora(iso: string): string {
+  return new Date(iso).toLocaleTimeString("es-CR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatFechaCorta(iso: string): string {
+  return new Date(iso).toLocaleDateString("es-CR", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatDuracion(minutos: number): string {
+  const h = Math.floor(minutos / 60);
+  const m = minutos % 60;
+  if (h === 0) return `${m}m`;
+  return `${h}h ${m}m`;
+}
+
+// ─── Agrupar registros en jornadas (entrada + salida) ───
+
+interface Jornada {
+  trabajador: string;
+  cedula: string;
+  entrada: string | null;
+  salida: string | null;
+  duracionMin: number;
+}
+
+function agruparJornadas(registros: RegistroAdmin[]): Record<string, Jornada[]> {
+  // Por ubicacion -> array de jornadas
+  const porUbicacion: Record<string, Jornada[]> = {};
+
+  // Ordenar registros por trabajador + fecha ascendente
+  const ordenados = [...registros].sort((a, b) => {
+    if (a.trabajador.cedula !== b.trabajador.cedula) {
+      return a.trabajador.cedula.localeCompare(b.trabajador.cedula);
+    }
+    return new Date(a.fecha).getTime() - new Date(b.fecha).getTime();
+  });
+
+  // Emparejar entradas con salidas por trabajador
+  const entradasPendientes: Record<string, RegistroAdmin> = {};
+
+  for (const r of ordenados) {
+    const key = r.trabajador.cedula;
+    if (r.tipo === "entrada") {
+      // Si ya habia una entrada sin cerrar, registrarla como jornada abierta
+      if (entradasPendientes[key]) {
+        const prev = entradasPendientes[key];
+        const ubic = prev.ubicacion || prev.trabajador.ubicacion || "Sin ubicacion";
+        if (!porUbicacion[ubic]) porUbicacion[ubic] = [];
+        porUbicacion[ubic].push({
+          trabajador: prev.trabajador.nombre,
+          cedula: prev.trabajador.cedula,
+          entrada: prev.fecha,
+          salida: null,
+          duracionMin: 0,
+        });
+      }
+      entradasPendientes[key] = r;
+    } else if (r.tipo === "salida") {
+      const entrada = entradasPendientes[key];
+      if (entrada) {
+        const ubic = entrada.ubicacion || r.ubicacion || r.trabajador.ubicacion || "Sin ubicacion";
+        const dur = Math.max(
+          0,
+          Math.floor((new Date(r.fecha).getTime() - new Date(entrada.fecha).getTime()) / 60000)
+        );
+        if (!porUbicacion[ubic]) porUbicacion[ubic] = [];
+        porUbicacion[ubic].push({
+          trabajador: entrada.trabajador.nombre,
+          cedula: entrada.trabajador.cedula,
+          entrada: entrada.fecha,
+          salida: r.fecha,
+          duracionMin: dur,
+        });
+        delete entradasPendientes[key];
+      } else {
+        // Salida sin entrada correspondiente - registrarla suelta
+        const ubic = r.ubicacion || r.trabajador.ubicacion || "Sin ubicacion";
+        if (!porUbicacion[ubic]) porUbicacion[ubic] = [];
+        porUbicacion[ubic].push({
+          trabajador: r.trabajador.nombre,
+          cedula: r.trabajador.cedula,
+          entrada: null,
+          salida: r.fecha,
+          duracionMin: 0,
+        });
+      }
+    }
+  }
+
+  // Las entradas que nunca cerraron
+  for (const key of Object.keys(entradasPendientes)) {
+    const r = entradasPendientes[key];
+    const ubic = r.ubicacion || r.trabajador.ubicacion || "Sin ubicacion";
+    if (!porUbicacion[ubic]) porUbicacion[ubic] = [];
+    porUbicacion[ubic].push({
+      trabajador: r.trabajador.nombre,
+      cedula: r.trabajador.cedula,
+      entrada: r.fecha,
+      salida: null,
+      duracionMin: 0,
+    });
+  }
+
+  // Dentro de cada ubicacion, ordenar por fecha descendente
+  for (const ubic of Object.keys(porUbicacion)) {
+    porUbicacion[ubic].sort((a, b) => {
+      const ta = a.entrada || a.salida || "";
+      const tb = b.entrada || b.salida || "";
+      return new Date(tb).getTime() - new Date(ta).getTime();
+    });
+  }
+
+  return porUbicacion;
+}
+
+// ─── Agrupar rondas por ubicacion ───
+
+function agruparRondas(rondas: RondaAdmin[]): Record<string, RondaAdmin[]> {
+  const result: Record<string, RondaAdmin[]> = {};
+  for (const r of rondas) {
+    if (!result[r.ubicacion]) result[r.ubicacion] = [];
+    result[r.ubicacion].push(r);
+  }
+  for (const u of Object.keys(result)) {
+    result[u].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+  }
+  return result;
+}
+
 export default function RegistrosPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [tab, setTab] = useState<"registros" | "rondas" | "bitacoras">("registros");
-  const [filtroPuesto, setFiltroPuesto] = useState("todos");
+  const [filtros, setFiltros] = useState<FiltrosState>(filtrosIniciales);
 
   const isAdmin = session?.user?.role === "admin";
-  const { data: registros } = useApiGet<RegistroAdmin[]>(isAdmin ? "/api/admin/registros" : null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: rondas } = useApiGet<any[]>(isAdmin ? "/api/admin/rondas" : null);
-  const { data: bitacoras } = useApiGet<BitacoraAdmin[]>(isAdmin ? "/api/admin/bitacoras" : null);
+  const query = buildFiltrosQuery(filtros);
+
+  const { data: registros } = useApiGet<RegistroAdmin[]>(
+    isAdmin ? `/api/admin/registros?${query}` : null
+  );
+  const { data: rondas } = useApiGet<RondaAdmin[]>(
+    isAdmin ? `/api/admin/rondas?${query}` : null
+  );
+  const { data: bitacoras } = useApiGet<BitacoraAdmin[]>(
+    isAdmin ? `/api/admin/bitacoras?${query}` : null
+  );
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
 
-  const bitacorasFiltradas = useMemo(() =>
-    filtroPuesto === "todos"
-      ? (bitacoras || [])
-      : (bitacoras || []).filter((b) => b.ubicacion === filtroPuesto),
-    [bitacoras, filtroPuesto]
+  const jornadasPorPuesto = useMemo(() => agruparJornadas(registros || []), [registros]);
+  const rondasPorPuesto = useMemo(() => agruparRondas(rondas || []), [rondas]);
+  const bitacorasPorPuesto = useMemo(
+    () =>
+      (bitacoras || []).reduce<Record<string, BitacoraAdmin[]>>((acc, b) => {
+        if (!acc[b.ubicacion]) acc[b.ubicacion] = [];
+        acc[b.ubicacion].push(b);
+        return acc;
+      }, {}),
+    [bitacoras]
   );
 
-  const bitacorasPorPuesto = useMemo(() =>
-    bitacorasFiltradas.reduce<Record<string, BitacoraAdmin[]>>((acc, b) => {
-      if (!acc[b.ubicacion]) acc[b.ubicacion] = [];
-      acc[b.ubicacion].push(b);
-      return acc;
-    }, {}),
-    [bitacorasFiltradas]
-  );
+  const exportar = () => {
+    const params = new URLSearchParams(query);
+    params.set("tipo", tab);
+    window.location.href = `/api/admin/registros/export?${params.toString()}`;
+  };
 
-  if (status === "loading" || !registros || !rondas || !bitacoras) {
+  if (status === "loading") {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <p className="text-gray-400">Cargando...</p>
@@ -57,9 +215,13 @@ export default function RegistrosPage() {
 
   if (!isAdmin) return null;
 
+  const cargando = !registros || !rondas || !bitacoras;
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <h1 className="mb-8 text-3xl font-bold text-gray-900">Registros, Rondas y Bitacoras</h1>
+      <h1 className="mb-6 text-3xl font-bold text-gray-900">Registros, Rondas y Bitacoras</h1>
+
+      <FiltroFechas filtros={filtros} onChange={setFiltros} onExportar={exportar} />
 
       {/* Tabs */}
       <div className="mb-6 flex rounded-lg bg-gray-100 p-1 sm:w-fit">
@@ -89,186 +251,261 @@ export default function RegistrosPage() {
         </button>
       </div>
 
-      {tab === "registros" && (
-        <div className="card overflow-hidden p-0">
-          {registros.length === 0 ? (
-            <div className="p-8 text-center text-gray-400">No hay registros.</div>
-          ) : (
+      {cargando ? (
+        <div className="card p-8 text-center text-gray-400">Cargando...</div>
+      ) : (
+        <>
+          {tab === "registros" && <TabRegistros porPuesto={jornadasPorPuesto} />}
+          {tab === "rondas" && <TabRondas porPuesto={rondasPorPuesto} />}
+          {tab === "bitacoras" && <TabBitacoras porPuesto={bitacorasPorPuesto} />}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Tab Registros ───
+
+function TabRegistros({ porPuesto }: { porPuesto: Record<string, Jornada[]> }) {
+  const puestos = Object.keys(porPuesto).sort();
+  if (puestos.length === 0) {
+    return <div className="card p-8 text-center text-gray-400">No hay registros en el rango seleccionado.</div>;
+  }
+
+  return (
+    <div>
+      {puestos.map((puesto) => {
+        const jornadas = porPuesto[puesto];
+        const trabajadoresUnicos = new Set(jornadas.map((j) => j.cedula)).size;
+        const totalMinutos = jornadas.reduce((sum, j) => sum + j.duracionMin, 0);
+        const jornadasCerradas = jornadas.filter((j) => j.entrada && j.salida).length;
+
+        return (
+          <AcordeonPuesto
+            key={puesto}
+            titulo={puesto}
+            subtitulo={`${jornadas.length} jornada${jornadas.length !== 1 ? "s" : ""} registrada${jornadas.length !== 1 ? "s" : ""}`}
+            color="primary"
+            stats={[
+              { label: "Trabajadores", value: trabajadoresUnicos },
+              { label: "Completas", value: jornadasCerradas },
+              { label: "Horas", value: formatDuracion(totalMinutos) },
+            ]}
+          >
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
                   <tr>
-                    <th className="px-6 py-3">Trabajador</th>
-                    <th className="px-6 py-3">Cedula</th>
-                    <th className="px-6 py-3">Tipo</th>
-                    <th className="px-6 py-3">Puesto</th>
-                    <th className="px-6 py-3">Fecha y Hora</th>
-                    <th className="px-6 py-3">Nota</th>
+                    <th className="px-5 py-3">Trabajador</th>
+                    <th className="px-5 py-3">Fecha</th>
+                    <th className="px-5 py-3">Entrada</th>
+                    <th className="px-5 py-3">Salida</th>
+                    <th className="px-5 py-3">Duracion</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {registros.map((r) => (
-                    <tr key={r.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{r.trabajador.nombre}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{r.trabajador.cedula}</td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          r.tipo === "entrada" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                        }`}>
-                          {r.tipo === "entrada" ? "Entrada" : "Salida"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{r.ubicacion || r.trabajador.ubicacion}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{new Date(r.fecha).toLocaleString()}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{r.nota || "-"}</td>
-                    </tr>
-                  ))}
+                <tbody className="divide-y divide-gray-100">
+                  {jornadas.map((j, i) => {
+                    const fechaRef = j.entrada || j.salida!;
+                    return (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="px-5 py-3">
+                          <p className="text-sm font-medium text-gray-900">{j.trabajador}</p>
+                          <p className="text-xs text-gray-400">{j.cedula}</p>
+                        </td>
+                        <td className="px-5 py-3 text-sm text-gray-600">{formatFechaCorta(fechaRef)}</td>
+                        <td className="px-5 py-3">
+                          {j.entrada ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                              {formatHora(j.entrada)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3">
+                          {j.salida ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
+                              {formatHora(j.salida)}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                              En servicio
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-sm font-semibold text-gray-700">
+                          {j.duracionMin > 0 ? formatDuracion(j.duracionMin) : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
-          )}
-        </div>
-      )}
+          </AcordeonPuesto>
+        );
+      })}
+    </div>
+  );
+}
 
-      {tab === "rondas" && (
-        <div>
-          {rondas.length === 0 ? (
-            <div className="card p-8 text-center text-gray-400">No hay rondas registradas.</div>
-          ) : (
-            <div className="space-y-4">
-              {rondas.map((r) => {
-                const puntosEscaneados = r.escaneos?.length || 0;
-                const total = r.totalPuntos || 0;
-                const progreso = total > 0 ? (puntosEscaneados / total) * 100 : 0;
+// ─── Tab Rondas ───
+
+function TabRondas({ porPuesto }: { porPuesto: Record<string, RondaAdmin[]> }) {
+  const puestos = Object.keys(porPuesto).sort();
+  if (puestos.length === 0) {
+    return <div className="card p-8 text-center text-gray-400">No hay rondas en el rango seleccionado.</div>;
+  }
+
+  return (
+    <div>
+      {puestos.map((puesto) => {
+        const lista = porPuesto[puesto];
+        const completas = lista.filter((r) => r.completada).length;
+        const pct = lista.length > 0 ? Math.round((completas / lista.length) * 100) : 0;
+        const trabajadoresUnicos = new Set(lista.map((r) => r.trabajador.cedula)).size;
+
+        // Color del header segun completitud
+        const color = pct >= 80 ? "green" : pct >= 50 ? "amber" : "red";
+
+        return (
+          <AcordeonPuesto
+            key={puesto}
+            titulo={puesto}
+            subtitulo={`${lista.length} ronda${lista.length !== 1 ? "s" : ""} \u2022 Ultima: ${formatFechaCorta(lista[0].fecha)} ${formatHora(lista[0].fecha)}`}
+            color={color}
+            stats={[
+              { label: "Total", value: lista.length },
+              { label: "Completas", value: `${pct}%` },
+              { label: "Guardias", value: trabajadoresUnicos },
+            ]}
+          >
+            <div className="divide-y divide-gray-100">
+              {lista.map((r) => {
+                const escaneados = r.escaneos?.length || 0;
+                const progreso = r.totalPuntos > 0 ? (escaneados / r.totalPuntos) * 100 : 0;
 
                 return (
-                  <div key={r.id} className="card p-0 overflow-hidden">
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-                      <div className="flex items-center gap-3">
-                        {/* Semaforo */}
-                        <span className={`inline-flex h-4 w-4 rounded-full ${
-                          r.completada ? "bg-green-500" : puntosEscaneados > 0 ? "bg-amber-500" : "bg-red-500"
-                        }`} />
+                  <div key={r.id} className="px-5 py-4">
+                    <div className="mb-2 flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex h-3 w-3 rounded-full ${
+                            r.completada ? "bg-green-500" : escaneados > 0 ? "bg-amber-500" : "bg-red-500"
+                          }`}
+                        />
                         <div>
-                          <span className="text-sm font-medium text-gray-900">{r.trabajador.nombre}</span>
-                          <span className="ml-2 text-xs text-gray-400">({r.trabajador.cedula})</span>
+                          <p className="text-sm font-medium text-gray-900">{r.trabajador.nombre}</p>
+                          <p className="text-xs text-gray-400">
+                            {formatFechaCorta(r.fecha)} {"\u2022"} {formatHora(r.fecha)}
+                          </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          r.completada ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
-                        }`}>
-                          {puntosEscaneados}/{total} puntos
-                        </span>
-                        <p className="text-xs text-gray-400 mt-0.5">{new Date(r.fecha).toLocaleString()}</p>
-                      </div>
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                          r.completada
+                            ? "bg-green-100 text-green-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {escaneados}/{r.totalPuntos} puntos
+                      </span>
                     </div>
 
-                    {/* Barra de progreso */}
-                    <div className="px-6 py-2 bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-gray-500 shrink-0">{r.ubicacion}</span>
-                        <div className="h-2 flex-1 rounded-full bg-gray-200 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${r.completada ? "bg-green-500" : "bg-amber-500"}`}
-                            style={{ width: `${progreso}%` }}
-                          />
-                        </div>
-                      </div>
+                    <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-gray-200">
+                      <div
+                        className={`h-full rounded-full ${r.completada ? "bg-green-500" : "bg-amber-500"}`}
+                        style={{ width: `${progreso}%` }}
+                      />
                     </div>
 
-                    {/* Detalle de escaneos */}
                     {r.escaneos && r.escaneos.length > 0 && (
-                      <div className="px-6 py-3">
-                        <div className="flex flex-wrap gap-2">
-                          {r.escaneos.map((e: { id: string; fecha: string; puntoRuta: { nombre: string } }) => (
-                            <span key={e.id} className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-xs text-green-700">
-                              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              {e.puntoRuta.nombre}
-                              <span className="text-green-500 ml-1">{new Date(e.fecha).toLocaleTimeString()}</span>
-                            </span>
-                          ))}
-                        </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {r.escaneos.map((e) => (
+                          <span
+                            key={e.id}
+                            className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[10px] text-green-700"
+                          >
+                            <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            {e.puntoRuta.nombre} {formatHora(e.fecha)}
+                          </span>
+                        ))}
                       </div>
                     )}
 
-                    {/* Observaciones */}
                     {(r.observaciones || r.novedades) && (
-                      <div className="px-6 py-3 border-t border-gray-100">
-                        {r.observaciones && <p className="text-xs text-gray-500">{r.observaciones}</p>}
-                        {r.novedades && <p className="text-xs font-medium text-red-600 mt-1">Novedad: {r.novedades}</p>}
+                      <div className="mt-2 rounded-lg bg-gray-50 px-3 py-2">
+                        {r.observaciones && <p className="text-xs text-gray-600">{r.observaciones}</p>}
+                        {r.novedades && (
+                          <p className="mt-1 text-xs font-medium text-red-600">Novedad: {r.novedades}</p>
+                        )}
                       </div>
                     )}
                   </div>
                 );
               })}
             </div>
-          )}
-        </div>
-      )}
+          </AcordeonPuesto>
+        );
+      })}
+    </div>
+  );
+}
 
-      {tab === "bitacoras" && (
-        <div>
-          <div className="mb-4 flex flex-wrap gap-2">
-            <button
-              onClick={() => setFiltroPuesto("todos")}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
-                filtroPuesto === "todos" ? "bg-primary-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              Todos
-            </button>
-            {UBICACIONES.map((p) => (
-              <button
-                key={p}
-                onClick={() => setFiltroPuesto(p)}
-                className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
-                  filtroPuesto === p ? "bg-primary-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
+// ─── Tab Bitacoras ───
 
-          {Object.keys(bitacorasPorPuesto).length === 0 ? (
-            <div className="card p-8 text-center text-gray-400">No hay bitacoras registradas.</div>
-          ) : (
-            <div className="space-y-6">
-              {Object.entries(bitacorasPorPuesto).map(([puesto, entries]) => (
-                <div key={puesto} className="card p-0 overflow-hidden">
-                  <div className="bg-primary-700 px-6 py-3">
-                    <h3 className="text-sm font-bold text-white">{puesto}</h3>
-                    <p className="text-xs text-primary-200">{entries.length} registro{entries.length !== 1 ? "s" : ""}</p>
+function TabBitacoras({ porPuesto }: { porPuesto: Record<string, BitacoraAdmin[]> }) {
+  const puestos = Object.keys(porPuesto).sort();
+  if (puestos.length === 0) {
+    return <div className="card p-8 text-center text-gray-400">No hay bitacoras en el rango seleccionado.</div>;
+  }
+
+  return (
+    <div>
+      {puestos.map((puesto) => {
+        const lista = [...porPuesto[puesto]].sort(
+          (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
+        );
+        const guardias = new Set(lista.map((b) => b.trabajador.cedula)).size;
+
+        return (
+          <AcordeonPuesto
+            key={puesto}
+            titulo={puesto}
+            subtitulo={`Ultima entrega: ${formatFechaCorta(lista[0].fecha)} ${formatHora(lista[0].fecha)}`}
+            color="primary"
+            stats={[
+              { label: "Entradas", value: lista.length },
+              { label: "Guardias", value: guardias },
+            ]}
+          >
+            <div className="divide-y divide-gray-100">
+              {lista.map((b) => (
+                <div key={b.id} className="px-5 py-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{b.trabajador.nombre}</p>
+                      <p className="text-xs text-gray-400">{b.trabajador.cedula}</p>
+                    </div>
+                    <span className="text-xs text-gray-400">
+                      {formatFechaCorta(b.fecha)} {"\u2022"} {formatHora(b.fecha)}
+                    </span>
                   </div>
-                  <div className="divide-y divide-gray-100">
-                    {entries.map((b) => (
-                      <div key={b.id} className="px-6 py-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm font-medium text-gray-900">{b.trabajador.nombre}</span>
-                            <span className="text-xs text-gray-400">({b.trabajador.cedula})</span>
-                          </div>
-                          <span className="text-xs text-gray-400">{new Date(b.fecha).toLocaleString()}</span>
-                        </div>
-                        <p className="text-sm text-gray-700 mb-2">{b.incidencias}</p>
-                        <div className="flex items-center gap-1 text-xs text-primary-600">
-                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                          </svg>
-                          Entregado a: <span className="font-medium">{b.entregaA}</span>
-                        </div>
-                      </div>
-                    ))}
+                  <p className="mb-2 text-sm text-gray-700">{b.incidencias}</p>
+                  <div className="flex items-center gap-1 text-xs text-primary-600">
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                    Entregado a: <span className="font-medium">{b.entregaA}</span>
                   </div>
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      )}
+          </AcordeonPuesto>
+        );
+      })}
     </div>
   );
 }

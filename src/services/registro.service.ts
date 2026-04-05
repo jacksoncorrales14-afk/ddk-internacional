@@ -11,11 +11,34 @@ export async function listarRegistrosTrabajador(trabajadorId: string) {
   });
 }
 
-export async function listarRegistrosAdmin() {
+export interface FiltrosRegistros {
+  desde?: Date;
+  hasta?: Date;
+  trabajadorId?: string;
+  ubicacion?: string;
+  limit?: number;
+}
+
+function buildWhere(filtros: FiltrosRegistros): Record<string, unknown> {
+  const where: Record<string, unknown> = {};
+  if (filtros.trabajadorId) where.trabajadorId = filtros.trabajadorId;
+  if (filtros.ubicacion) where.ubicacion = filtros.ubicacion;
+  if (filtros.desde || filtros.hasta) {
+    const fecha: Record<string, Date> = {};
+    if (filtros.desde) fecha.gte = filtros.desde;
+    if (filtros.hasta) fecha.lte = filtros.hasta;
+    where.fecha = fecha;
+  }
+  return where;
+}
+
+export async function listarRegistrosAdmin(filtros: FiltrosRegistros = {}) {
+  const where = buildWhere(filtros);
   return prisma.registroHorario.findMany({
+    where,
     include: { trabajador: { select: { nombre: true, cedula: true, ubicacion: true } } },
     orderBy: { fecha: "desc" },
-    take: 100,
+    take: filtros.limit || 500,
   });
 }
 
@@ -107,11 +130,13 @@ export async function listarBitacorasTrabajador(trabajadorId: string) {
   });
 }
 
-export async function listarBitacorasAdmin() {
+export async function listarBitacorasAdmin(filtros: FiltrosRegistros = {}) {
+  const where = buildWhere(filtros);
   return prisma.bitacora.findMany({
+    where,
     include: { trabajador: { select: { nombre: true, cedula: true } } },
     orderBy: { fecha: "desc" },
-    take: 200,
+    take: filtros.limit || 500,
   });
 }
 

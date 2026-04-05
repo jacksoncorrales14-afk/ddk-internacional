@@ -52,6 +52,7 @@ export interface ListCandidatosOptions {
   limit?: number;
   estado?: string;
   puesto?: string;
+  q?: string;
 }
 
 export interface PaginatedResult<T> {
@@ -65,12 +66,20 @@ export interface PaginatedResult<T> {
 export async function listarCandidatos(
   options: ListCandidatosOptions = {}
 ): Promise<PaginatedResult<Candidato>> {
-  const { page = 1, limit = 20, estado, puesto } = options;
+  const { page = 1, limit = 20, estado, puesto, q } = options;
   const skip = (page - 1) * limit;
 
-  const where: Record<string, string> = {};
+  const where: Record<string, unknown> = {};
   if (estado && estado !== "todos") where.estado = estado;
   if (puesto && puesto !== "todos") where.puesto = puesto;
+  if (q && q.trim()) {
+    const term = q.trim();
+    where.OR = [
+      { nombre: { contains: term, mode: "insensitive" } },
+      { cedula: { contains: term } },
+      { email: { contains: term, mode: "insensitive" } },
+    ];
+  }
 
   const [candidatos, total] = await Promise.all([
     prisma.candidato.findMany({

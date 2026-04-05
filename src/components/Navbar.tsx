@@ -4,11 +4,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
+import NotificacionesBell from "./admin/NotificacionesBell";
 
 export function Navbar() {
   const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const role = session?.user?.role;
+  const homeHref = role === "admin" ? "/admin" : role === "trabajador" ? "/trabajador" : null;
 
   return (
     <nav className="sticky top-0 z-50 border-b border-primary-100 bg-primary-700/95 backdrop-blur-md" aria-label="Navegacion principal">
@@ -21,29 +23,26 @@ export function Navbar() {
         </Link>
 
         {/* Desktop */}
-        <div className="hidden items-center gap-6 md:flex">
+        <div className="hidden items-center gap-4 md:flex">
           <Link
             href="/aplicar"
             className="text-sm font-medium text-primary-100 transition-colors hover:text-white"
           >
             Aplicar
           </Link>
-          {role === "trabajador" && (
+          {homeHref && (
             <Link
-              href="/trabajador"
-              className="text-sm font-medium text-primary-100 transition-colors hover:text-white"
+              href={homeHref}
+              className="flex items-center gap-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-500"
+              aria-label="Ir al inicio"
             >
-              Mi Panel
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              Inicio
             </Link>
           )}
-          {role === "admin" && (
-            <Link
-              href="/admin"
-              className="text-sm font-medium text-primary-100 transition-colors hover:text-white"
-            >
-              Admin
-            </Link>
-          )}
+          {role === "admin" && <NotificacionesBell />}
           {session ? (
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
@@ -86,19 +85,21 @@ export function Navbar() {
       {menuOpen && (
         <div className="border-t border-primary-600 bg-primary-700 px-4 py-4 md:hidden">
           <div className="flex flex-col gap-3">
+            {homeHref && (
+              <Link
+                href={homeHref}
+                className="flex items-center gap-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white"
+                onClick={() => setMenuOpen(false)}
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                Inicio
+              </Link>
+            )}
             <Link href="/aplicar" className="text-sm font-medium text-primary-100" onClick={() => setMenuOpen(false)}>
               Aplicar
             </Link>
-            {role === "trabajador" && (
-              <Link href="/trabajador" className="text-sm font-medium text-primary-100" onClick={() => setMenuOpen(false)}>
-                Mi Panel
-              </Link>
-            )}
-            {role === "admin" && (
-              <Link href="/admin" className="text-sm font-medium text-primary-100" onClick={() => setMenuOpen(false)}>
-                Admin
-              </Link>
-            )}
             {session ? (
               <button
                 onClick={() => { signOut({ callbackUrl: "/" }); setMenuOpen(false); }}

@@ -38,6 +38,10 @@ export interface Trabajador {
   activo: boolean;
   activado: boolean;
   codigoActivacion: string | null;
+  horaInicio: string | null;
+  horaFin: string | null;
+  diasSemana: string | null;
+  toleranciaMin: number;
   biometriaRegistrada: boolean;
   enServicio: boolean;
   ubicacionActual: string | null;

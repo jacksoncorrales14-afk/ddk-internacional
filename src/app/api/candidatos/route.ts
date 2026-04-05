@@ -6,6 +6,7 @@ import {
   crearCandidato,
   subirAtestados,
 } from "@/services/candidato.service";
+import { crearNotificacion } from "@/services/notificacion.service";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -18,8 +19,9 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(searchParams.get("limit") || "20");
   const estado = searchParams.get("estado") || undefined;
   const puesto = searchParams.get("puesto") || undefined;
+  const q = searchParams.get("q") || undefined;
 
-  const result = await listarCandidatos({ page, limit, estado, puesto });
+  const result = await listarCandidatos({ page, limit, estado, puesto, q });
   return NextResponse.json(result);
 }
 
@@ -57,6 +59,14 @@ export async function POST(req: NextRequest) {
     const archivos = formData.getAll("archivos") as File[];
     const tiposArchivo = formData.getAll("tiposArchivo") as string[];
     await subirAtestados(candidato.id, archivos, tiposArchivo);
+
+    // Notificar al admin
+    await crearNotificacion({
+      tipo: "candidato_nuevo",
+      titulo: "Nuevo candidato registrado",
+      mensaje: `${candidato.nombre} aplico para el puesto de ${candidato.puesto}.`,
+      link: "/admin/candidatos",
+    });
 
     return NextResponse.json(candidato, { status: 201 });
   } catch (error) {

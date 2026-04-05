@@ -1,14 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { listarRondasAdmin } from "@/services/ronda.service";
+import { parseFiltros } from "@/lib/filters";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.role || session.user.role !== "admin") {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const rondas = await listarRondasAdmin();
+  const filtros = parseFiltros(req.url);
+  const rondas = await listarRondasAdmin(filtros);
   return NextResponse.json(rondas);
 }
