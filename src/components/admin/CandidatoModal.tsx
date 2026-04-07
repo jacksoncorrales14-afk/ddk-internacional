@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Candidato, tipoDocLabels, UBICACIONES, calcularPuntaje, getMedalla } from "@/types/models";
+import { Candidato, Ubicacion, tipoDocLabels, calcularPuntaje, getMedalla } from "@/types/models";
+import { useApiGet } from "@/hooks/useApi";
 
 const tipoAtestadoLabels: Record<string, string> = {
   cv: "Curriculum Vitae",
@@ -52,6 +53,8 @@ export default function CandidatoModal({ candidato, onClose, onAprobar, onRechaz
   const [loading, setLoading] = useState(false);
   const [codigoGenerado, setCodigoGenerado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { data: ubicacionesData } = useApiGet<Ubicacion[]>("/api/admin/ubicaciones");
+  const ubicacionesNombres = (ubicacionesData || []).filter((u) => u.activa).map((u) => u.nombre);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -249,7 +252,7 @@ export default function CandidatoModal({ candidato, onClose, onAprobar, onRechaz
                 required
               >
                 <option value="">Seleccionar ubicacion</option>
-                {UBICACIONES.map((u) => (
+                {ubicacionesNombres.map((u) => (
                   <option key={u} value={u}>{u}</option>
                 ))}
               </select>

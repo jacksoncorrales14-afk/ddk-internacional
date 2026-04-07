@@ -158,6 +158,13 @@ export const ESTADO_BITACORA_LABELS: Record<string, string> = {
   cerrado: "Cerrado",
 };
 
+export interface Ubicacion {
+  id: string;
+  nombre: string;
+  activa: boolean;
+}
+
+/** @deprecated Usar ubicaciones dinamicas desde /api/admin/ubicaciones en su lugar */
 export const UBICACIONES = [
   "Jacaranda",
   "Malinches",

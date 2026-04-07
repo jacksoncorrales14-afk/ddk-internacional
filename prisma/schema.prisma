@@ -211,3 +211,12 @@ model AuditoriaLog {
   @@index([createdAt])
   @@index([adminId])
 }
+
+model Ubicacion {
+  id        String   @id @default(cuid())
+  nombre    String   @unique
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([activa])
+}

@@ -3,7 +3,8 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { UBICACIONES } from "@/types/models";
+import { Ubicacion } from "@/types/models";
+import { useApiGet } from "@/hooks/useApi";
 import Breadcrumb from "@/components/admin/Breadcrumb";
 
 export default function QRPage() {
@@ -11,12 +12,15 @@ export default function QRPage() {
   const router = useRouter();
   const [qrData, setQrData] = useState<{ puesto: string; qrDataUrl: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const isAdmin = session?.user?.role === "admin";
+  const { data: ubicacionesData } = useApiGet<Ubicacion[]>(isAdmin ? "/api/admin/ubicaciones" : null);
+  const ubicacionesNombres = (ubicacionesData || []).filter((u) => u.activa).map((u) => u.nombre);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
 
-  if (session?.user?.role !== "admin") return null;
+  if (!isAdmin) return null;
 
   const generarQR = async (puesto: string) => {
     setLoading(true);
@@ -63,7 +67,7 @@ export default function QRPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {UBICACIONES.map((puesto) => (
+        {ubicacionesNombres.map((puesto) => (
           <button
             key={puesto}
             onClick={() => generarQR(puesto)}

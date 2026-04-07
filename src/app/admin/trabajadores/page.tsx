@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { Trabajador, UBICACIONES } from "@/types/models";
+import { Trabajador, Ubicacion } from "@/types/models";
 import { useApiGet } from "@/hooks/useApi";
 import BuscadorTexto from "@/components/admin/BuscadorTexto";
 import { TableSkeleton } from "@/components/Skeleton";
@@ -189,6 +189,126 @@ function LicenciaSelect({ name, defaultValue }: { name: string; defaultValue?: s
   );
 }
 
+interface WorkerComponentProps {
+  t: Trabajador;
+  abrirEditor: (t: Trabajador) => void;
+  toggleActivo: (id: string, activo: boolean) => void;
+  regenerarCodigo: (id: string) => void;
+  revocarBiometria: (id: string, nombre: string) => void;
+  handleDelete: (id: string, nombre: string) => void;
+  formatearHorario: (t: Trabajador) => string;
+}
+
+function MobileWorkerCard({ t, abrirEditor, toggleActivo, regenerarCodigo, revocarBiometria, handleDelete, formatearHorario }: WorkerComponentProps) {
+  return (
+    <div className="card p-4">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm font-bold text-gray-900">{t.nombre}</p>
+          <p className="text-xs capitalize text-gray-400">{t.puesto}</p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {t.biometriaRegistrada ? (
+            <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Bio</span>
+          ) : (
+            <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Sin Bio</span>
+          )}
+          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+            !t.activo
+              ? "bg-gray-100 text-gray-600"
+              : t.enServicio
+                ? "bg-green-100 text-green-700"
+                : "bg-red-100 text-red-700"
+          }`}>
+            {!t.activo ? "Inactivo" : t.enServicio ? "Activo" : "Ausente"}
+          </span>
+        </div>
+      </div>
+      <div className="mt-2 space-y-1 text-xs text-gray-500">
+        <p>Cedula: {t.cedula}</p>
+        <p>Ubicacion: {t.ubicacion}</p>
+        <p>Horario: {formatearHorario(t)}</p>
+        {t.enServicio && t.ubicacionActual && (
+          <p className="font-medium text-primary-600">En: {t.ubicacionActual}</p>
+        )}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-3">
+        <button onClick={() => abrirEditor(t)} className="text-xs font-medium text-primary-600 hover:text-primary-800">Editar</button>
+        <button onClick={() => toggleActivo(t.id, t.activo)} className={`text-xs font-medium ${t.activo ? "text-red-600 hover:text-red-800" : "text-green-600 hover:text-green-800"}`}>{t.activo ? "Desactivar" : "Activar"}</button>
+        {!t.biometriaRegistrada && (
+          <button onClick={() => regenerarCodigo(t.id)} className="text-xs font-medium text-primary-600 hover:text-primary-800">Codigo</button>
+        )}
+        {t.biometriaRegistrada && (
+          <button onClick={() => revocarBiometria(t.id, t.nombre)} className="text-xs font-medium text-amber-600 hover:text-amber-800">Revocar Bio</button>
+        )}
+        <button onClick={() => handleDelete(t.id, t.nombre)} className="text-xs font-medium text-red-400 hover:text-red-600">Eliminar</button>
+      </div>
+    </div>
+  );
+}
+
+function WorkerTableRow({ t, abrirEditor, toggleActivo, regenerarCodigo, revocarBiometria, handleDelete, formatearHorario }: WorkerComponentProps) {
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="px-3 py-3">
+        <div>
+          <p className="text-sm font-medium text-gray-900">{t.nombre}</p>
+          <p className="text-xs capitalize text-gray-400">{t.puesto}</p>
+        </div>
+      </td>
+      <td className="px-3 py-3 text-sm text-gray-500">{t.cedula}</td>
+      <td className="px-3 py-3 text-sm text-gray-500">{t.ubicacion}</td>
+      <td className="px-3 py-3 text-xs text-gray-500">
+        <button onClick={() => abrirEditor(t)} className="text-primary-600 hover:text-primary-800">
+          {formatearHorario(t)}
+        </button>
+      </td>
+      <td className="px-3 py-3 text-center">
+        {t.biometriaRegistrada ? (
+          <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Si</span>
+        ) : (
+          <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">No</span>
+        )}
+      </td>
+      <td className="px-3 py-3 text-center">
+        <div>
+          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+            !t.activo
+              ? "bg-gray-100 text-gray-600"
+              : t.enServicio
+                ? "bg-green-100 text-green-700"
+                : "bg-red-100 text-red-700"
+          }`}>
+            {!t.activo ? "Inactivo" : t.enServicio ? "Activo" : "Ausente"}
+          </span>
+          {t.enServicio && t.ubicacionActual && (
+            <p className="mt-1 text-xs font-medium text-primary-600">{t.ubicacionActual}</p>
+          )}
+        </div>
+      </td>
+      <td className="px-3 py-3 text-center text-sm text-gray-500">{t.diasTrabajados}</td>
+      <td className="px-3 py-3 text-center text-sm text-gray-500">{t.horasTotales}h</td>
+      <td className="px-3 py-3">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <button onClick={() => abrirEditor(t)} className="text-xs font-medium text-primary-600 hover:text-primary-800">Editar</button>
+            <button onClick={() => toggleActivo(t.id, t.activo)} className={`text-xs font-medium ${t.activo ? "text-red-600 hover:text-red-800" : "text-green-600 hover:text-green-800"}`}>{t.activo ? "Desactivar" : "Activar"}</button>
+          </div>
+          <div className="flex items-center gap-2">
+            {!t.biometriaRegistrada && (
+              <button onClick={() => regenerarCodigo(t.id)} className="text-xs font-medium text-primary-600 hover:text-primary-800">Codigo</button>
+            )}
+            {t.biometriaRegistrada && (
+              <button onClick={() => revocarBiometria(t.id, t.nombre)} className="text-xs font-medium text-amber-600 hover:text-amber-800">Revocar Bio</button>
+            )}
+            <button onClick={() => handleDelete(t.id, t.nombre)} className="text-xs font-medium text-red-400 hover:text-red-600">Eliminar</button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 export default function TrabajadoresPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -207,9 +327,49 @@ export default function TrabajadoresPage() {
   const [editTipoDoc, setEditTipoDoc] = useState("cedula");
   const [editHorarios, setEditHorarios] = useState<HorarioDiaForm[]>(defaultHorarios);
 
+  const [filtroUbicacion, setFiltroUbicacion] = useState<string>("Todos");
+  const [seccionesAbiertas, setSeccionesAbiertas] = useState<Record<string, boolean>>({});
+
   const isAdmin = session?.user?.role === "admin";
   const url = isAdmin ? `/api/admin/trabajadores${q.trim() ? "?q=" + encodeURIComponent(q.trim()) : ""}` : null;
   const { data: trabajadores, mutate } = useApiGet<Trabajador[]>(url);
+  const { data: ubicaciones } = useApiGet<Ubicacion[]>(isAdmin ? "/api/admin/ubicaciones" : null);
+
+  const ubicacionesNombres = (ubicaciones || []).filter((u) => u.activa).map((u) => u.nombre);
+
+  const toggleSeccion = useCallback((nombre: string) => {
+    setSeccionesAbiertas((prev) => ({ ...prev, [nombre]: !prev[nombre] }));
+  }, []);
+
+  // Group workers by ubicacion
+  const trabajadoresFiltrados = trabajadores
+    ? filtroUbicacion === "Todos"
+      ? trabajadores
+      : trabajadores.filter((t) => t.ubicacion === filtroUbicacion)
+    : null;
+
+  const gruposPorUbicacion = (() => {
+    if (!trabajadoresFiltrados || filtroUbicacion !== "Todos") return null;
+    const grupos: Record<string, Trabajador[]> = {};
+    for (const t of trabajadoresFiltrados) {
+      const key = t.ubicacion || "Sin ubicacion";
+      if (!grupos[key]) grupos[key] = [];
+      grupos[key].push(t);
+    }
+    // Sort workers within each group alphabetically
+    for (const key of Object.keys(grupos)) {
+      grupos[key].sort((a, b) => a.nombre.localeCompare(b.nombre));
+    }
+    // Sort groups by ubicacion name
+    const sorted = Object.entries(grupos).sort(([a], [b]) => a.localeCompare(b));
+    return sorted;
+  })();
+
+  // When filtering by specific ubicacion, sort alphabetically
+  const trabajadoresOrdenados = (() => {
+    if (filtroUbicacion === "Todos" || !trabajadoresFiltrados) return trabajadoresFiltrados;
+    return [...trabajadoresFiltrados].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  })();
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -423,6 +583,31 @@ export default function TrabajadoresPage() {
         </div>
       </div>
 
+      {/* Filtro por ubicacion */}
+      {ubicacionesNombres.length > 0 && (
+        <div className="mb-6 flex flex-wrap gap-2">
+          <button
+            onClick={() => setFiltroUbicacion("Todos")}
+            className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+              filtroUbicacion === "Todos" ? "bg-primary-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            Todos
+          </button>
+          {ubicacionesNombres.map((u) => (
+            <button
+              key={u}
+              onClick={() => setFiltroUbicacion(u)}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                filtroUbicacion === u ? "bg-primary-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {u}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Codigo de activacion generado */}
       {codigoMostrado && (
         <div className="card mb-8 border-2 border-green-300 bg-green-50">
@@ -518,7 +703,7 @@ export default function TrabajadoresPage() {
               <label className="mb-1 block text-sm font-medium text-gray-700">Ubicacion Asignada</label>
               <select name="ubicacion" className="input-field" required defaultValue="">
                 <option value="" disabled>Seleccionar ubicacion</option>
-                {UBICACIONES.map((u) => (
+                {ubicacionesNombres.map((u) => (
                   <option key={u} value={u}>{u}</option>
                 ))}
               </select>
@@ -660,7 +845,7 @@ export default function TrabajadoresPage() {
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">Ubicacion</label>
                   <select name="ubicacion" defaultValue={editando.ubicacion} className="input-field" required>
-                    {UBICACIONES.map((u) => (
+                    {ubicacionesNombres.map((u) => (
                       <option key={u} value={u}>{u}</option>
                     ))}
                   </select>
@@ -733,89 +918,41 @@ export default function TrabajadoresPage() {
 
       {/* Mobile cards */}
       <div className="md:hidden space-y-3">
-        {!trabajadores ? (
+        {!trabajadoresFiltrados ? (
           <div className="card p-8 text-center text-gray-400">Cargando...</div>
-        ) : trabajadores.length === 0 ? (
+        ) : trabajadoresFiltrados.length === 0 ? (
           <div className="card p-8 text-center text-gray-400">No hay trabajadores registrados.</div>
-        ) : (
-          trabajadores.map((t) => (
-            <div key={t.id} className="card p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-bold text-gray-900">{t.nombre}</p>
-                  <p className="text-xs capitalize text-gray-400">{t.puesto}</p>
+        ) : filtroUbicacion === "Todos" && gruposPorUbicacion ? (
+          gruposPorUbicacion.map(([ubicacion, workers]) => (
+            <div key={ubicacion}>
+              <button
+                onClick={() => toggleSeccion(ubicacion)}
+                className="mb-2 flex w-full items-center justify-between rounded-lg bg-gray-100 px-4 py-2.5"
+              >
+                <span className="text-sm font-bold text-gray-700">{ubicacion} ({workers.length})</span>
+                <svg className={`h-4 w-4 text-gray-500 transition-transform ${seccionesAbiertas[ubicacion] === false ? "" : "rotate-180"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {seccionesAbiertas[ubicacion] !== false && (
+                <div className="space-y-3 mb-4">
+                  {workers.map((t) => (
+                    <MobileWorkerCard key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} regenerarCodigo={regenerarCodigo} revocarBiometria={revocarBiometria} handleDelete={handleDelete} formatearHorario={formatearHorario} />
+                  ))}
                 </div>
-                <div className="flex items-center gap-1.5">
-                  {t.biometriaRegistrada ? (
-                    <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Bio</span>
-                  ) : (
-                    <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Sin Bio</span>
-                  )}
-                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                    !t.activo
-                      ? "bg-gray-100 text-gray-600"
-                      : t.enServicio
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                  }`}>
-                    {!t.activo ? "Inactivo" : t.enServicio ? "Activo" : "Ausente"}
-                  </span>
-                </div>
-              </div>
-              <div className="mt-2 space-y-1 text-xs text-gray-500">
-                <p>Cedula: {t.cedula}</p>
-                <p>Ubicacion: {t.ubicacion}</p>
-                <p>Horario: {formatearHorario(t)}</p>
-                {t.enServicio && t.ubicacionActual && (
-                  <p className="font-medium text-primary-600">En: {t.ubicacionActual}</p>
-                )}
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-3">
-                <button
-                  onClick={() => abrirEditor(t)}
-                  className="text-xs font-medium text-primary-600 hover:text-primary-800"
-                >
-                  Editar
-                </button>
-                <button
-                  onClick={() => toggleActivo(t.id, t.activo)}
-                  className={`text-xs font-medium ${t.activo ? "text-red-600 hover:text-red-800" : "text-green-600 hover:text-green-800"}`}
-                >
-                  {t.activo ? "Desactivar" : "Activar"}
-                </button>
-                {!t.biometriaRegistrada && (
-                  <button
-                    onClick={() => regenerarCodigo(t.id)}
-                    className="text-xs font-medium text-primary-600 hover:text-primary-800"
-                  >
-                    Codigo
-                  </button>
-                )}
-                {t.biometriaRegistrada && (
-                  <button
-                    onClick={() => revocarBiometria(t.id, t.nombre)}
-                    className="text-xs font-medium text-amber-600 hover:text-amber-800"
-                  >
-                    Revocar Bio
-                  </button>
-                )}
-                <button
-                  onClick={() => handleDelete(t.id, t.nombre)}
-                  className="text-xs font-medium text-red-400 hover:text-red-600"
-                >
-                  Eliminar
-                </button>
-              </div>
+              )}
             </div>
+          ))
+        ) : (
+          (trabajadoresOrdenados || []).map((t) => (
+            <MobileWorkerCard key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} regenerarCodigo={regenerarCodigo} revocarBiometria={revocarBiometria} handleDelete={handleDelete} formatearHorario={formatearHorario} />
           ))
         )}
       </div>
 
       {/* Tabla (desktop) */}
       <div className="card hidden md:block overflow-hidden p-0">
-        {!trabajadores ? (
+        {!trabajadoresFiltrados ? (
           <TableSkeleton columns={9} rows={5} />
-        ) : trabajadores.length === 0 ? (
+        ) : trabajadoresFiltrados.length === 0 ? (
           <div className="p-8 text-center text-gray-400">No hay trabajadores registrados.</div>
         ) : (
           <div className="overflow-x-auto">
@@ -834,90 +971,27 @@ export default function TrabajadoresPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {trabajadores.map((t) => (
-                  <tr key={t.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-3">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{t.nombre}</p>
-                        <p className="text-xs capitalize text-gray-400">{t.puesto}</p>
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 text-sm text-gray-500">{t.cedula}</td>
-                    <td className="px-3 py-3 text-sm text-gray-500">{t.ubicacion}</td>
-                    <td className="px-3 py-3 text-xs text-gray-500">
-                      <button onClick={() => abrirEditor(t)} className="text-primary-600 hover:text-primary-800">
-                        {formatearHorario(t)}
-                      </button>
-                    </td>
-                    <td className="px-3 py-3 text-center">
-                      {t.biometriaRegistrada ? (
-                        <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Si</span>
-                      ) : (
-                        <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">No</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-center">
-                      <div>
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          !t.activo
-                            ? "bg-gray-100 text-gray-600"
-                            : t.enServicio
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
-                        }`}>
-                          {!t.activo ? "Inactivo" : t.enServicio ? "Activo" : "Ausente"}
-                        </span>
-                        {t.enServicio && t.ubicacionActual && (
-                          <p className="mt-1 text-xs font-medium text-primary-600">{t.ubicacionActual}</p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 text-center text-sm text-gray-500">{t.diasTrabajados}</td>
-                    <td className="px-3 py-3 text-center text-sm text-gray-500">{t.horasTotales}h</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => abrirEditor(t)}
-                            className="text-xs font-medium text-primary-600 hover:text-primary-800"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => toggleActivo(t.id, t.activo)}
-                            className={`text-xs font-medium ${t.activo ? "text-red-600 hover:text-red-800" : "text-green-600 hover:text-green-800"}`}
-                          >
-                            {t.activo ? "Desactivar" : "Activar"}
-                          </button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {!t.biometriaRegistrada && (
-                            <button
-                              onClick={() => regenerarCodigo(t.id)}
-                              className="text-xs font-medium text-primary-600 hover:text-primary-800"
-                            >
-                              Codigo
-                            </button>
-                          )}
-                          {t.biometriaRegistrada && (
-                            <button
-                              onClick={() => revocarBiometria(t.id, t.nombre)}
-                              className="text-xs font-medium text-amber-600 hover:text-amber-800"
-                            >
-                              Revocar Bio
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDelete(t.id, t.nombre)}
-                            className="text-xs font-medium text-red-400 hover:text-red-600"
-                          >
-                            Eliminar
-                          </button>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filtroUbicacion === "Todos" && gruposPorUbicacion ? (
+                  gruposPorUbicacion.map(([ubicacion, workers]) => (
+                    <>
+                      <tr key={`header-${ubicacion}`} className="bg-gray-100 cursor-pointer" onClick={() => toggleSeccion(ubicacion)}>
+                        <td colSpan={9} className="px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-bold text-gray-700">{ubicacion} ({workers.length})</span>
+                            <svg className={`h-4 w-4 text-gray-500 transition-transform ${seccionesAbiertas[ubicacion] === false ? "" : "rotate-180"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                          </div>
+                        </td>
+                      </tr>
+                      {seccionesAbiertas[ubicacion] !== false && workers.map((t) => (
+                        <WorkerTableRow key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} regenerarCodigo={regenerarCodigo} revocarBiometria={revocarBiometria} handleDelete={handleDelete} formatearHorario={formatearHorario} />
+                      ))}
+                    </>
+                  ))
+                ) : (
+                  (trabajadoresOrdenados || []).map((t) => (
+                    <WorkerTableRow key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} regenerarCodigo={regenerarCodigo} revocarBiometria={revocarBiometria} handleDelete={handleDelete} formatearHorario={formatearHorario} />
+                  ))
+                )}
               </tbody>
             </table>
           </div>

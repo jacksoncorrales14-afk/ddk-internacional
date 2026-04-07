@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { UBICACIONES } from "@/types/models";
+import { Ubicacion } from "@/types/models";
 import { useApiGet } from "@/hooks/useApi";
 import Breadcrumb from "@/components/admin/Breadcrumb";
 
@@ -17,15 +17,25 @@ interface PuntoRuta {
 export default function RutasPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState(UBICACIONES[0]);
+  const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [nombre, setNombre] = useState("");
   const [qrData, setQrData] = useState<{ nombre: string; qrDataUrl: string } | null>(null);
 
   const isAdmin = session?.user?.role === "admin";
+  const { data: ubicacionesData } = useApiGet<Ubicacion[]>(isAdmin ? "/api/admin/ubicaciones" : null);
+  const ubicacionesNombres = (ubicacionesData || []).filter((u) => u.activa).map((u) => u.nombre);
+
+  // Set default selection when ubicaciones load
+  useEffect(() => {
+    if (ubicacionesNombres.length > 0 && !ubicacionSeleccionada) {
+      setUbicacionSeleccionada(ubicacionesNombres[0]);
+    }
+  }, [ubicacionesNombres, ubicacionSeleccionada]);
+
   const { data: puntos, mutate } = useApiGet<PuntoRuta[]>(
-    isAdmin ? `/api/admin/puntos-ruta?ubicacion=${encodeURIComponent(ubicacionSeleccionada)}` : null
+    isAdmin && ubicacionSeleccionada ? `/api/admin/puntos-ruta?ubicacion=${encodeURIComponent(ubicacionSeleccionada)}` : null
   );
 
   useEffect(() => {
@@ -108,7 +118,7 @@ export default function RutasPage() {
 
       {/* Selector de ubicacion */}
       <div className="mb-6 flex flex-wrap gap-2">
-        {UBICACIONES.map((u) => (
+        {ubicacionesNombres.map((u) => (
           <button
             key={u}
             onClick={() => { setUbicacionSeleccionada(u); setQrData(null); }}
