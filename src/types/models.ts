@@ -29,6 +29,14 @@ export interface Candidato {
   atestados: Atestado[];
 }
 
+export interface HorarioDia {
+  id: string;
+  diaSemana: number;
+  horaInicio: string;
+  horaFin: string;
+  toleranciaMin: number;
+}
+
 export interface Trabajador {
   id: string;
   nombre: string;
@@ -44,6 +52,19 @@ export interface Trabajador {
   horaFin: string | null;
   diasSemana: string | null;
   toleranciaMin: number;
+  // Campos equivalentes a Candidato
+  tipoDocumento: string | null;
+  fechaNacimiento: string | null;
+  paisOrigen: string | null;
+  direccion: string | null;
+  experiencia: string | null;
+  aniosExperiencia: number | null;
+  disponibilidad: string | null;
+  portacionArma: boolean;
+  licenciaConducir: string | null;
+  cursoBasicoPolicial: boolean;
+  // Horarios por dia
+  horarios: HorarioDia[];
   biometriaRegistrada: boolean;
   enServicio: boolean;
   ubicacionActual: string | null;

@@ -47,6 +47,13 @@ export const candidatoUpdateSchema = z.object({
 });
 
 // POST /api/admin/trabajadores
+const horarioDiaSchema = z.object({
+  diaSemana: z.number().min(1).max(7),
+  horaInicio: z.string().min(1, "Hora inicio requerida"),
+  horaFin: z.string().min(1, "Hora fin requerida"),
+  toleranciaMin: z.union([z.number(), z.string().transform(Number)]).default(15),
+});
+
 export const trabajadorCreateSchema = z.object({
   nombre: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
   cedula: z.string().min(4, "La cedula debe tener al menos 4 caracteres"),
@@ -60,6 +67,19 @@ export const trabajadorCreateSchema = z.object({
   horaFin: z.string().optional(),
   diasSemana: z.string().optional(),
   toleranciaMin: z.union([z.number(), z.string().transform(Number)]).optional(),
+  // Campos equivalentes a Candidato
+  tipoDocumento: z.enum(["cedula", "pasaporte", "dimex"]).optional(),
+  fechaNacimiento: z.string().optional(),
+  paisOrigen: z.string().optional(),
+  direccion: z.string().optional(),
+  experiencia: z.string().optional(),
+  aniosExperiencia: z.union([z.number(), z.string().transform(Number)]).optional(),
+  disponibilidad: z.string().optional(),
+  portacionArma: z.union([z.boolean(), z.string().transform((v) => v === "true")]).optional(),
+  licenciaConducir: z.string().optional(),
+  cursoBasicoPolicial: z.union([z.boolean(), z.string().transform((v) => v === "true")]).optional(),
+  // Horarios por dia
+  horarios: z.array(horarioDiaSchema).optional(),
 });
 
 // PATCH /api/admin/trabajadores/[id]
@@ -79,4 +99,17 @@ export const trabajadorUpdateSchema = z.object({
   activo: z.boolean().optional(),
   regenerarCodigo: z.boolean().optional(),
   revocarBiometria: z.boolean().optional(),
+  // Campos equivalentes a Candidato
+  tipoDocumento: z.enum(["cedula", "pasaporte", "dimex"]).nullable().optional(),
+  fechaNacimiento: z.string().nullable().optional(),
+  paisOrigen: z.string().nullable().optional(),
+  direccion: z.string().nullable().optional(),
+  experiencia: z.string().nullable().optional(),
+  aniosExperiencia: z.union([z.number(), z.string().transform(Number)]).nullable().optional(),
+  disponibilidad: z.string().nullable().optional(),
+  portacionArma: z.union([z.boolean(), z.string().transform((v) => v === "true")]).optional(),
+  licenciaConducir: z.string().nullable().optional(),
+  cursoBasicoPolicial: z.union([z.boolean(), z.string().transform((v) => v === "true")]).optional(),
+  // Horarios por dia
+  horarios: z.array(horarioDiaSchema).optional(),
 });

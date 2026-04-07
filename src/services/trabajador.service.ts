@@ -19,7 +19,10 @@ export async function listarTrabajadoresConStats(q?: string) {
     prisma.trabajador.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      include: { _count: { select: { credenciales: true } } },
+      include: {
+        _count: { select: { credenciales: true } },
+        horarios: { orderBy: { diaSemana: "asc" } },
+      },
     }),
 
     // Single raw SQL query combining latest record + work stats using CTEs
@@ -100,6 +103,25 @@ export async function listarTrabajadoresConStats(q?: string) {
       horaFin: t.horaFin,
       diasSemana: t.diasSemana,
       toleranciaMin: t.toleranciaMin,
+      // Campos equivalentes a Candidato
+      tipoDocumento: t.tipoDocumento,
+      fechaNacimiento: t.fechaNacimiento,
+      paisOrigen: t.paisOrigen,
+      direccion: t.direccion,
+      experiencia: t.experiencia,
+      aniosExperiencia: t.aniosExperiencia,
+      disponibilidad: t.disponibilidad,
+      portacionArma: t.portacionArma,
+      licenciaConducir: t.licenciaConducir,
+      cursoBasicoPolicial: t.cursoBasicoPolicial,
+      // Horarios por dia
+      horarios: t.horarios.map((h) => ({
+        id: h.id,
+        diaSemana: h.diaSemana,
+        horaInicio: h.horaInicio,
+        horaFin: h.horaFin,
+        toleranciaMin: h.toleranciaMin,
+      })),
       biometriaRegistrada: t._count.credenciales > 0,
       createdAt: t.createdAt,
       enServicio: stats?.ultimoTipo === "entrada",
@@ -125,10 +147,23 @@ export async function crearTrabajador(data: {
   horaFin?: string | null;
   diasSemana?: string | null;
   toleranciaMin?: number;
+  // Campos equivalentes a Candidato
+  tipoDocumento?: string;
+  fechaNacimiento?: string;
+  paisOrigen?: string;
+  direccion?: string;
+  experiencia?: string;
+  aniosExperiencia?: number;
+  disponibilidad?: string;
+  portacionArma?: boolean;
+  licenciaConducir?: string;
+  cursoBasicoPolicial?: boolean;
+  // Horarios por dia
+  horarios?: { diaSemana: number; horaInicio: string; horaFin: string; toleranciaMin?: number }[];
 }) {
   const codigoActivacion = generarCodigoActivacion();
 
-  return prisma.trabajador.create({
+  const trabajador = await prisma.trabajador.create({
     data: {
       nombre: data.nombre,
       cedula: data.cedula,
@@ -141,8 +176,34 @@ export async function crearTrabajador(data: {
       diasSemana: data.diasSemana || null,
       toleranciaMin: data.toleranciaMin ?? 15,
       codigoActivacion,
+      // Campos equivalentes a Candidato
+      tipoDocumento: data.tipoDocumento || null,
+      fechaNacimiento: data.fechaNacimiento ? new Date(data.fechaNacimiento) : null,
+      paisOrigen: data.paisOrigen || null,
+      direccion: data.direccion || null,
+      experiencia: data.experiencia || null,
+      aniosExperiencia: data.aniosExperiencia != null ? Number(data.aniosExperiencia) : null,
+      disponibilidad: data.disponibilidad || null,
+      portacionArma: data.portacionArma ?? false,
+      licenciaConducir: data.licenciaConducir || null,
+      cursoBasicoPolicial: data.cursoBasicoPolicial ?? false,
     },
   });
+
+  // Crear horarios por dia si se proporcionaron
+  if (data.horarios && data.horarios.length > 0) {
+    await prisma.horarioDia.createMany({
+      data: data.horarios.map((h) => ({
+        trabajadorId: trabajador.id,
+        diaSemana: h.diaSemana,
+        horaInicio: h.horaInicio,
+        horaFin: h.horaFin,
+        toleranciaMin: h.toleranciaMin ?? 15,
+      })),
+    });
+  }
+
+  return trabajador;
 }
 
 export async function regenerarCodigo(id: string) {
@@ -191,10 +252,38 @@ export async function actualizarTrabajador(
   id: string,
   data: Record<string, unknown>
 ) {
-  return prisma.trabajador.update({
+  // Extract horarios before passing to Prisma update
+  const horarios = data.horarios as { diaSemana: number; horaInicio: string; horaFin: string; toleranciaMin?: number }[] | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { horarios: _h, ...updateData } = data;
+
+  // Convert fechaNacimiento string to Date if present
+  if (typeof updateData.fechaNacimiento === "string") {
+    updateData.fechaNacimiento = new Date(updateData.fechaNacimiento as string);
+  }
+
+  const trabajador = await prisma.trabajador.update({
     where: { id },
-    data,
+    data: updateData,
   });
+
+  // Replace horarios if provided
+  if (horarios !== undefined) {
+    await prisma.horarioDia.deleteMany({ where: { trabajadorId: id } });
+    if (horarios.length > 0) {
+      await prisma.horarioDia.createMany({
+        data: horarios.map((h) => ({
+          trabajadorId: id,
+          diaSemana: h.diaSemana,
+          horaInicio: h.horaInicio,
+          horaFin: h.horaFin,
+          toleranciaMin: h.toleranciaMin ?? 15,
+        })),
+      });
+    }
+  }
+
+  return trabajador;
 }
 
 // ─── Deteccion de ausencias ───
@@ -210,17 +299,24 @@ function minutosDesdeHora(hhmm: string): number {
  */
 export async function detectarAusencias() {
   const ahora = new Date();
-  const diaSemana = ahora.getDay() === 0 ? "7" : String(ahora.getDay()); // 1..7 lun..dom
+  const diaSemanaNum = ahora.getDay() === 0 ? 7 : ahora.getDay(); // 1..7 lun..dom
+  const diaSemanaStr = String(diaSemanaNum);
   const minutosActuales = ahora.getHours() * 60 + ahora.getMinutes();
 
   const inicioDia = new Date(ahora);
   inicioDia.setHours(0, 0, 0, 0);
 
-  // Trabajadores activos con horario definido
+  // Trabajadores activos con horario definido (old fields OR new HorarioDia records)
   const trabajadores = await prisma.trabajador.findMany({
     where: {
       activo: true,
-      horaInicio: { not: null },
+      OR: [
+        { horaInicio: { not: null } },
+        { horarios: { some: {} } },
+      ],
+    },
+    include: {
+      horarios: true,
     },
   });
 
@@ -249,20 +345,35 @@ export async function detectarAusencias() {
   const ausentes: { id: string; nombre: string; ubicacion: string }[] = [];
 
   for (const t of trabajadores) {
-    if (!t.horaInicio) continue;
-    // Verificar si hoy es un dia laboral para este trabajador
-    const dias = (t.diasSemana || "").split(",").filter(Boolean);
-    if (dias.length > 0 && !dias.includes(diaSemana)) continue;
+    // Check HorarioDia records first (new system)
+    const horarioDia = t.horarios.find((h) => h.diaSemana === diaSemanaNum);
 
-    const horaInicioMin = minutosDesdeHora(t.horaInicio);
-    const limite = horaInicioMin + (t.toleranciaMin ?? 15);
+    if (horarioDia) {
+      // Use per-day schedule
+      const horaInicioMin = minutosDesdeHora(horarioDia.horaInicio);
+      const limite = horaInicioMin + horarioDia.toleranciaMin;
 
-    // Solo evaluamos despues de la hora de inicio + tolerancia
-    if (minutosActuales < limite) continue;
+      if (minutosActuales < limite) continue;
 
-    // Verificar si ya marco entrada hoy (from pre-fetched set)
-    if (!trabajadoresConEntrada.has(t.id)) {
-      ausentes.push({ id: t.id, nombre: t.nombre, ubicacion: t.ubicacion });
+      if (!trabajadoresConEntrada.has(t.id)) {
+        ausentes.push({ id: t.id, nombre: t.nombre, ubicacion: t.ubicacion });
+      }
+    } else if (t.horarios.length > 0) {
+      // Worker has HorarioDia records but not for today -> not scheduled today
+      continue;
+    } else if (t.horaInicio) {
+      // Backward compatibility: use old flat fields
+      const dias = (t.diasSemana || "").split(",").filter(Boolean);
+      if (dias.length > 0 && !dias.includes(diaSemanaStr)) continue;
+
+      const horaInicioMin = minutosDesdeHora(t.horaInicio);
+      const limite = horaInicioMin + (t.toleranciaMin ?? 15);
+
+      if (minutosActuales < limite) continue;
+
+      if (!trabajadoresConEntrada.has(t.id)) {
+        ausentes.push({ id: t.id, nombre: t.nombre, ubicacion: t.ubicacion });
+      }
     }
   }
 

@@ -9,7 +9,17 @@ import BuscadorTexto from "@/components/admin/BuscadorTexto";
 import { TableSkeleton } from "@/components/Skeleton";
 import Breadcrumb from "@/components/admin/Breadcrumb";
 
-const DIAS = [
+const DIAS_SEMANA = [
+  { value: 1, label: "Lunes", short: "L" },
+  { value: 2, label: "Martes", short: "M" },
+  { value: 3, label: "Miercoles", short: "X" },
+  { value: 4, label: "Jueves", short: "J" },
+  { value: 5, label: "Viernes", short: "V" },
+  { value: 6, label: "Sabado", short: "S" },
+  { value: 7, label: "Domingo", short: "D" },
+];
+
+const DIAS_LEGACY = [
   { value: "1", label: "L" },
   { value: "2", label: "M" },
   { value: "3", label: "X" },
@@ -19,14 +29,164 @@ const DIAS = [
   { value: "7", label: "D" },
 ];
 
+interface HorarioDiaForm {
+  diaSemana: number;
+  enabled: boolean;
+  horaInicio: string;
+  horaFin: string;
+  toleranciaMin: number;
+}
+
+function defaultHorarios(): HorarioDiaForm[] {
+  return DIAS_SEMANA.map((d) => ({
+    diaSemana: d.value,
+    enabled: d.value <= 5, // Mon-Fri enabled by default
+    horaInicio: "",
+    horaFin: "",
+    toleranciaMin: 15,
+  }));
+}
+
+function horariosFromTrabajador(t: Trabajador): HorarioDiaForm[] {
+  return DIAS_SEMANA.map((d) => {
+    const existing = t.horarios?.find((h) => h.diaSemana === d.value);
+    return {
+      diaSemana: d.value,
+      enabled: !!existing,
+      horaInicio: existing?.horaInicio || "",
+      horaFin: existing?.horaFin || "",
+      toleranciaMin: existing?.toleranciaMin ?? 15,
+    };
+  });
+}
+
 function formatearHorario(t: Trabajador): string {
+  if (t.horarios && t.horarios.length > 0) {
+    const dias = t.horarios
+      .map((h) => DIAS_SEMANA.find((d) => d.value === h.diaSemana)?.short || "")
+      .join("");
+    const first = t.horarios[0];
+    return `${first.horaInicio}-${first.horaFin} ${dias}`;
+  }
   if (!t.horaInicio || !t.horaFin) return "Sin horario";
   const dias = (t.diasSemana || "")
     .split(",")
     .filter(Boolean)
-    .map((d) => DIAS.find((dd) => dd.value === d)?.label || "")
+    .map((d) => DIAS_LEGACY.find((dd) => dd.value === d)?.label || "")
     .join("");
   return `${t.horaInicio}-${t.horaFin}${dias ? " " + dias : ""}`;
+}
+
+function HorarioDiaEditor({
+  horarios,
+  onChange,
+}: {
+  horarios: HorarioDiaForm[];
+  onChange: (h: HorarioDiaForm[]) => void;
+}) {
+  const update = (idx: number, field: keyof HorarioDiaForm, value: unknown) => {
+    const next = [...horarios];
+    next[idx] = { ...next[idx], [field]: value };
+    onChange(next);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="hidden sm:grid sm:grid-cols-[120px_1fr_1fr_1fr_80px] gap-2 text-xs font-medium text-gray-500 px-1">
+        <span>Dia</span>
+        <span>Hora inicio</span>
+        <span>Hora fin</span>
+        <span>Tolerancia</span>
+        <span></span>
+      </div>
+      {horarios.map((h, idx) => {
+        const dia = DIAS_SEMANA.find((d) => d.value === h.diaSemana);
+        return (
+          <div
+            key={h.diaSemana}
+            className={`grid grid-cols-1 sm:grid-cols-[120px_1fr_1fr_1fr_80px] gap-2 items-center rounded-lg border p-2 ${
+              h.enabled ? "border-primary-200 bg-primary-50/50" : "border-gray-200 bg-gray-50"
+            }`}
+          >
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={h.enabled}
+                onChange={(e) => update(idx, "enabled", e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-primary-600"
+              />
+              <span className="text-sm font-medium text-gray-700">{dia?.label}</span>
+            </label>
+            <input
+              type="time"
+              value={h.horaInicio}
+              onChange={(e) => update(idx, "horaInicio", e.target.value)}
+              disabled={!h.enabled}
+              className="input-field text-sm disabled:opacity-40"
+            />
+            <input
+              type="time"
+              value={h.horaFin}
+              onChange={(e) => update(idx, "horaFin", e.target.value)}
+              disabled={!h.enabled}
+              className="input-field text-sm disabled:opacity-40"
+            />
+            <input
+              type="number"
+              value={h.toleranciaMin}
+              onChange={(e) => update(idx, "toleranciaMin", parseInt(e.target.value) || 0)}
+              disabled={!h.enabled}
+              min="0"
+              className="input-field text-sm disabled:opacity-40"
+              placeholder="min"
+            />
+            <span className="text-xs text-gray-400 sm:text-center">min</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const LICENCIAS = [
+  { group: "Tipo A - Motocicletas", options: [
+    { value: "A1", label: "A1 - Motocicletas menores de 125cc" },
+    { value: "A2", label: "A2 - Motocicletas de 125cc en adelante" },
+    { value: "A3", label: "A3 - Triciclos motorizados" },
+  ]},
+  { group: "Tipo B - Vehiculos livianos y buses", options: [
+    { value: "B1", label: "B1 - Automoviles y microbuses (hasta 8 pasajeros)" },
+    { value: "B2", label: "B2 - Vehiculos de carga liviana y taxis" },
+    { value: "B3", label: "B3 - Buses de hasta 35 pasajeros" },
+    { value: "B4", label: "B4 - Buses de mas de 35 pasajeros" },
+  ]},
+  { group: "Tipo C - Vehiculos de carga", options: [
+    { value: "C2", label: "C2 - Camiones livianos y medianos" },
+    { value: "C3", label: "C3 - Vehiculos pesados y articulados" },
+  ]},
+  { group: "Tipo D - Equipo especial", options: [
+    { value: "D1", label: "D1 - Equipo especial liviano" },
+    { value: "D2", label: "D2 - Equipo especial pesado" },
+    { value: "D3", label: "D3 - Equipo especial agricola" },
+  ]},
+  { group: "Tipo E - Maquinaria", options: [
+    { value: "E1", label: "E1 - Maquinaria agricola e industrial" },
+  ]},
+];
+
+function LicenciaSelect({ name, defaultValue }: { name: string; defaultValue?: string }) {
+  return (
+    <select name={name} defaultValue={defaultValue || ""} className="input-field">
+      <option value="">No posee licencia</option>
+      {LICENCIAS.map((g) => (
+        <optgroup key={g.group} label={g.group}>
+          {g.options.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
+  );
 }
 
 export default function TrabajadoresPage() {
@@ -38,6 +198,14 @@ export default function TrabajadoresPage() {
   const [q, setQ] = useState("");
   const [editando, setEditando] = useState<Trabajador | null>(null);
   const [diasSeleccionados, setDiasSeleccionados] = useState<string[]>([]);
+
+  // Create form state
+  const [createTipoDoc, setCreateTipoDoc] = useState("cedula");
+  const [createHorarios, setCreateHorarios] = useState<HorarioDiaForm[]>(defaultHorarios);
+
+  // Edit form state
+  const [editTipoDoc, setEditTipoDoc] = useState("cedula");
+  const [editHorarios, setEditHorarios] = useState<HorarioDiaForm[]>(defaultHorarios);
 
   const isAdmin = session?.user?.role === "admin";
   const url = isAdmin ? `/api/admin/trabajadores${q.trim() ? "?q=" + encodeURIComponent(q.trim()) : ""}` : null;
@@ -51,11 +219,51 @@ export default function TrabajadoresPage() {
     e.preventDefault();
     setFormLoading(true);
     const form = new FormData(e.currentTarget);
-    const dias = form.getAll("diasSemana") as string[];
-    const data: Record<string, unknown> = Object.fromEntries(
-      Array.from(form.entries()).filter(([k]) => k !== "diasSemana")
-    );
-    data.diasSemana = dias.join(",");
+    const data: Record<string, unknown> = {};
+
+    // Basic fields
+    data.nombre = form.get("nombre") as string;
+    data.cedula = form.get("cedula") as string;
+    data.email = form.get("email") as string;
+    data.telefono = form.get("telefono") as string;
+    data.puesto = form.get("puesto") as string;
+    data.ubicacion = form.get("ubicacion") as string;
+
+    // New personal fields
+    data.tipoDocumento = form.get("tipoDocumento") as string;
+    const fechaNac = form.get("fechaNacimiento") as string;
+    if (fechaNac) data.fechaNacimiento = fechaNac;
+    const paisOrigen = form.get("paisOrigen") as string;
+    if (paisOrigen) data.paisOrigen = paisOrigen;
+    const direccion = form.get("direccion") as string;
+    if (direccion) data.direccion = direccion;
+
+    // Experience fields
+    const anios = form.get("aniosExperiencia") as string;
+    if (anios) data.aniosExperiencia = parseInt(anios);
+    const experiencia = form.get("experiencia") as string;
+    if (experiencia) data.experiencia = experiencia;
+    const disponibilidad = form.get("disponibilidad") as string;
+    if (disponibilidad) data.disponibilidad = disponibilidad;
+
+    // Certifications
+    data.portacionArma = form.get("portacionArma") === "true";
+    const licencia = form.get("licenciaConducir") as string;
+    if (licencia) data.licenciaConducir = licencia;
+    data.cursoBasicoPolicial = form.get("cursoBasicoPolicial") === "true";
+
+    // Per-day schedules
+    const enabledHorarios = createHorarios
+      .filter((h) => h.enabled && h.horaInicio && h.horaFin)
+      .map((h) => ({
+        diaSemana: h.diaSemana,
+        horaInicio: h.horaInicio,
+        horaFin: h.horaFin,
+        toleranciaMin: h.toleranciaMin,
+      }));
+    if (enabledHorarios.length > 0) {
+      data.horarios = enabledHorarios;
+    }
 
     const res = await fetch("/api/admin/trabajadores", {
       method: "POST",
@@ -67,10 +275,12 @@ export default function TrabajadoresPage() {
       const trabajador = await res.json();
       setShowForm(false);
       setCodigoMostrado({ nombre: trabajador.nombre, codigo: trabajador.codigoActivacion });
+      setCreateTipoDoc("cedula");
+      setCreateHorarios(defaultHorarios());
       mutate();
     }
     setFormLoading(false);
-  }, [mutate]);
+  }, [mutate, createHorarios]);
 
   const toggleActivo = useCallback(async (id: string, activo: boolean) => {
     await fetch(`/api/admin/trabajadores/${id}`, {
@@ -127,6 +337,8 @@ export default function TrabajadoresPage() {
   const abrirEditor = useCallback((t: Trabajador) => {
     setEditando(t);
     setDiasSeleccionados((t.diasSemana || "").split(",").filter(Boolean));
+    setEditTipoDoc(t.tipoDocumento || "cedula");
+    setEditHorarios(horariosFromTrabajador(t));
   }, []);
 
   const guardarEdicion = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
@@ -144,7 +356,31 @@ export default function TrabajadoresPage() {
       horaFin: (form.get("horaFin") as string) || null,
       toleranciaMin: parseInt(form.get("toleranciaMin") as string) || 15,
       diasSemana: diasSeleccionados.join(","),
+      // New personal fields
+      tipoDocumento: form.get("tipoDocumento") as string || null,
+      fechaNacimiento: (form.get("fechaNacimiento") as string) || null,
+      paisOrigen: (form.get("paisOrigen") as string) || null,
+      direccion: (form.get("direccion") as string) || null,
+      // Experience fields
+      aniosExperiencia: parseInt(form.get("aniosExperiencia") as string) || null,
+      experiencia: (form.get("experiencia") as string) || null,
+      disponibilidad: (form.get("disponibilidad") as string) || null,
+      // Certifications
+      portacionArma: form.get("portacionArma") === "true",
+      licenciaConducir: (form.get("licenciaConducir") as string) || null,
+      cursoBasicoPolicial: form.get("cursoBasicoPolicial") === "true",
     };
+
+    // Per-day schedules
+    const enabledHorarios = editHorarios
+      .filter((h) => h.enabled && h.horaInicio && h.horaFin)
+      .map((h) => ({
+        diaSemana: h.diaSemana,
+        horaInicio: h.horaInicio,
+        horaFin: h.horaFin,
+        toleranciaMin: h.toleranciaMin,
+      }));
+    data.horarios = enabledHorarios;
 
     await fetch(`/api/admin/trabajadores/${editando.id}`, {
       method: "PATCH",
@@ -153,7 +389,7 @@ export default function TrabajadoresPage() {
     });
     setEditando(null);
     mutate();
-  }, [editando, diasSeleccionados, mutate]);
+  }, [editando, diasSeleccionados, editHorarios, mutate]);
 
   if (status === "loading") {
     return (
@@ -213,26 +449,64 @@ export default function TrabajadoresPage() {
       )}
 
       {showForm && (
-        <form onSubmit={handleCreate} className="card mb-8 space-y-4">
-          <h2 className="text-lg font-bold text-gray-900">Registrar Trabajador</h2>
-          <p className="text-sm text-gray-500">Al crear el trabajador se generara un codigo de activacion para que registre su acceso biometrico.</p>
+        <form onSubmit={handleCreate} className="card mb-8 space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Registrar Trabajador</h2>
+            <p className="text-sm text-gray-500">Al crear el trabajador se generara un codigo de activacion para que registre su acceso biometrico.</p>
+          </div>
+
+          {/* Datos personales */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
+            <h3 className="text-sm font-semibold text-gray-700">Datos Personales</h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Nombre</label>
+                <input name="nombre" className="input-field" required />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Tipo de Documento</label>
+                <select
+                  name="tipoDocumento"
+                  className="input-field"
+                  value={createTipoDoc}
+                  onChange={(e) => setCreateTipoDoc(e.target.value)}
+                >
+                  <option value="cedula">Cedula</option>
+                  <option value="pasaporte">Pasaporte</option>
+                  <option value="dimex">DIMEX</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Numero de Documento</label>
+                <input name="cedula" className="input-field" required />
+              </div>
+              {(createTipoDoc === "pasaporte" || createTipoDoc === "dimex") && (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Pais de Origen</label>
+                  <input name="paisOrigen" className="input-field" />
+                </div>
+              )}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Fecha de Nacimiento</label>
+                <input name="fechaNacimiento" type="date" className="input-field" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+                <input name="email" type="email" className="input-field" required />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Telefono</label>
+                <input name="telefono" className="input-field" required />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-gray-700">Direccion</label>
+                <input name="direccion" className="input-field" />
+              </div>
+            </div>
+          </div>
+
+          {/* Puesto y ubicacion */}
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Nombre</label>
-              <input name="nombre" className="input-field" required />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Cedula</label>
-              <input name="cedula" className="input-field" required />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
-              <input name="email" type="email" className="input-field" required />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Telefono</label>
-              <input name="telefono" className="input-field" required />
-            </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Puesto</label>
               <select name="puesto" className="input-field" required>
@@ -251,35 +525,53 @@ export default function TrabajadoresPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <h3 className="mb-3 text-sm font-semibold text-gray-700">Horario laboral (opcional)</h3>
-            <div className="grid gap-4 sm:grid-cols-3">
+          {/* Experiencia */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
+            <h3 className="text-sm font-semibold text-gray-700">Experiencia</h3>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Hora inicio</label>
-                <input name="horaInicio" type="time" className="input-field" />
+                <label className="mb-1 block text-sm font-medium text-gray-700">Anios de Experiencia</label>
+                <input name="aniosExperiencia" type="number" min="0" className="input-field" />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Hora fin</label>
-                <input name="horaFin" type="time" className="input-field" />
+                <label className="mb-1 block text-sm font-medium text-gray-700">Disponibilidad</label>
+                <input name="disponibilidad" className="input-field" placeholder="Ej: Inmediata, 2 semanas..." />
               </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Tolerancia (min)</label>
-                <input name="toleranciaMin" type="number" defaultValue="15" min="0" className="input-field" />
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-gray-700">Experiencia Laboral</label>
+                <textarea name="experiencia" rows={3} className="input-field" placeholder="Describa su experiencia laboral..." />
               </div>
             </div>
-            <div className="mt-3">
-              <label className="mb-2 block text-xs font-medium text-gray-600">Dias de la semana</label>
-              <div className="flex gap-2">
-                {DIAS.map((d) => (
-                  <label key={d.value} className="flex cursor-pointer items-center justify-center">
-                    <input type="checkbox" name="diasSemana" value={d.value} className="peer sr-only" />
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-600 peer-checked:border-primary-600 peer-checked:bg-primary-600 peer-checked:text-white">
-                      {d.label}
-                    </span>
-                  </label>
-                ))}
+          </div>
+
+          {/* Certificaciones */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
+            <h3 className="text-sm font-semibold text-gray-700">Certificaciones</h3>
+            <label className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 cursor-pointer hover:bg-gray-50">
+              <input name="portacionArma" type="checkbox" value="true" className="h-5 w-5 rounded border-gray-300 text-primary-600" />
+              <div>
+                <span className="text-sm font-medium text-gray-900">Portacion de Arma</span>
+                <p className="text-xs text-gray-500">Permiso vigente de portacion de arma</p>
               </div>
+            </label>
+            <div className="rounded-lg border border-gray-200 bg-white p-3">
+              <label className="mb-2 block text-sm font-medium text-gray-900">Licencia de Conducir</label>
+              <LicenciaSelect name="licenciaConducir" />
             </div>
+            <label className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 cursor-pointer hover:bg-gray-50">
+              <input name="cursoBasicoPolicial" type="checkbox" value="true" className="h-5 w-5 rounded border-gray-300 text-primary-600" />
+              <div>
+                <span className="text-sm font-medium text-gray-900">Curso Basico Policial</span>
+                <p className="text-xs text-gray-500">Certificacion de curso basico policial aprobado</p>
+              </div>
+            </label>
+          </div>
+
+          {/* Horario por dia */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
+            <h3 className="text-sm font-semibold text-gray-700">Horario Laboral por Dia (opcional)</h3>
+            <p className="text-xs text-gray-500">Configure el horario de trabajo para cada dia de la semana. Los dias sin marcar no se consideran laborales.</p>
+            <HorarioDiaEditor horarios={createHorarios} onChange={setCreateHorarios} />
           </div>
 
           <button type="submit" className="btn-primary" disabled={formLoading}>
@@ -291,7 +583,7 @@ export default function TrabajadoresPage() {
       {/* Modal de edicion de trabajador */}
       {editando && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold text-gray-900">Editar Trabajador</h2>
               <button onClick={() => setEditando(null)} className="text-gray-400 hover:text-gray-600" aria-label="Cerrar">
@@ -300,24 +592,64 @@ export default function TrabajadoresPage() {
                 </svg>
               </button>
             </div>
-            <form onSubmit={guardarEdicion} className="space-y-4">
+            <form onSubmit={guardarEdicion} className="space-y-5">
+              {/* Datos personales */}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700">Datos Personales</h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Nombre</label>
+                    <input name="nombre" defaultValue={editando.nombre} className="input-field" required />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Tipo de Documento</label>
+                    <select
+                      name="tipoDocumento"
+                      className="input-field"
+                      value={editTipoDoc}
+                      onChange={(e) => setEditTipoDoc(e.target.value)}
+                    >
+                      <option value="cedula">Cedula</option>
+                      <option value="pasaporte">Pasaporte</option>
+                      <option value="dimex">DIMEX</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Numero de Documento</label>
+                    <input name="cedula" defaultValue={editando.cedula} className="input-field" required />
+                  </div>
+                  {(editTipoDoc === "pasaporte" || editTipoDoc === "dimex") && (
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Pais de Origen</label>
+                      <input name="paisOrigen" defaultValue={editando.paisOrigen || ""} className="input-field" />
+                    </div>
+                  )}
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Fecha de Nacimiento</label>
+                    <input
+                      name="fechaNacimiento"
+                      type="date"
+                      defaultValue={editando.fechaNacimiento ? editando.fechaNacimiento.slice(0, 10) : ""}
+                      className="input-field"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+                    <input name="email" type="email" defaultValue={editando.email} className="input-field" required />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Telefono</label>
+                    <input name="telefono" defaultValue={editando.telefono} className="input-field" required />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Direccion</label>
+                    <input name="direccion" defaultValue={editando.direccion || ""} className="input-field" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Puesto y ubicacion */}
               <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Nombre</label>
-                  <input name="nombre" defaultValue={editando.nombre} className="input-field" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Cedula</label>
-                  <input name="cedula" defaultValue={editando.cedula} className="input-field" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
-                  <input name="email" type="email" defaultValue={editando.email} className="input-field" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Telefono</label>
-                  <input name="telefono" defaultValue={editando.telefono} className="input-field" required />
-                </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">Puesto</label>
                   <select name="puesto" defaultValue={editando.puesto} className="input-field" required>
@@ -335,46 +667,58 @@ export default function TrabajadoresPage() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <h3 className="mb-3 text-sm font-semibold text-gray-700">Horario laboral</h3>
-                <div className="grid grid-cols-3 gap-3">
+              {/* Experiencia */}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700">Experiencia</h3>
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">Hora inicio</label>
-                    <input name="horaInicio" type="time" defaultValue={editando.horaInicio || ""} className="input-field" />
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Anios de Experiencia</label>
+                    <input name="aniosExperiencia" type="number" min="0" defaultValue={editando.aniosExperiencia ?? ""} className="input-field" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">Hora fin</label>
-                    <input name="horaFin" type="time" defaultValue={editando.horaFin || ""} className="input-field" />
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Disponibilidad</label>
+                    <input name="disponibilidad" defaultValue={editando.disponibilidad || ""} className="input-field" />
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">Tolerancia (min)</label>
-                    <input name="toleranciaMin" type="number" defaultValue={editando.toleranciaMin || 15} min="0" className="input-field" />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <label className="mb-2 block text-xs font-medium text-gray-600">Dias de la semana</label>
-                  <div className="flex gap-2">
-                    {DIAS.map((d) => (
-                      <button
-                        type="button"
-                        key={d.value}
-                        onClick={() =>
-                          setDiasSeleccionados((prev) =>
-                            prev.includes(d.value) ? prev.filter((x) => x !== d.value) : [...prev, d.value]
-                          )
-                        }
-                        className={`flex h-9 w-9 items-center justify-center rounded-lg border text-sm font-medium ${
-                          diasSeleccionados.includes(d.value)
-                            ? "border-primary-600 bg-primary-600 text-white"
-                            : "border-gray-300 bg-white text-gray-600"
-                        }`}
-                      >
-                        {d.label}
-                      </button>
-                    ))}
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Experiencia Laboral</label>
+                    <textarea name="experiencia" rows={3} defaultValue={editando.experiencia || ""} className="input-field" />
                   </div>
                 </div>
               </div>
+
+              {/* Certificaciones */}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700">Certificaciones</h3>
+                <label className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 cursor-pointer hover:bg-gray-50">
+                  <input name="portacionArma" type="checkbox" value="true" defaultChecked={editando.portacionArma} className="h-5 w-5 rounded border-gray-300 text-primary-600" />
+                  <div>
+                    <span className="text-sm font-medium text-gray-900">Portacion de Arma</span>
+                    <p className="text-xs text-gray-500">Permiso vigente de portacion de arma</p>
+                  </div>
+                </label>
+                <div className="rounded-lg border border-gray-200 bg-white p-3">
+                  <label className="mb-2 block text-sm font-medium text-gray-900">Licencia de Conducir</label>
+                  <LicenciaSelect name="licenciaConducir" defaultValue={editando.licenciaConducir || ""} />
+                </div>
+                <label className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 cursor-pointer hover:bg-gray-50">
+                  <input name="cursoBasicoPolicial" type="checkbox" value="true" defaultChecked={editando.cursoBasicoPolicial} className="h-5 w-5 rounded border-gray-300 text-primary-600" />
+                  <div>
+                    <span className="text-sm font-medium text-gray-900">Curso Basico Policial</span>
+                    <p className="text-xs text-gray-500">Certificacion de curso basico policial aprobado</p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Horario por dia */}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700">Horario Laboral por Dia</h3>
+                <HorarioDiaEditor horarios={editHorarios} onChange={setEditHorarios} />
+              </div>
+
+              {/* Legacy schedule fields (hidden, for backward compat) */}
+              <input type="hidden" name="horaInicio" value="" />
+              <input type="hidden" name="horaFin" value="" />
+              <input type="hidden" name="toleranciaMin" value="15" />
 
               <div className="flex gap-3 pt-2">
                 <button type="submit" className="btn-primary flex-1">Guardar Cambios</button>

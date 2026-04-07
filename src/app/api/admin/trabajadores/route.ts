@@ -47,6 +47,10 @@ export async function POST(req: NextRequest) {
   const {
     nombre, cedula, email, telefono, puesto, ubicacion,
     horaInicio, horaFin, diasSemana, toleranciaMin,
+    tipoDocumento, fechaNacimiento, paisOrigen, direccion,
+    experiencia, aniosExperiencia, disponibilidad,
+    portacionArma, licenciaConducir, cursoBasicoPolicial,
+    horarios,
   } = validated.data;
 
   const trabajador = await crearTrabajador({
@@ -55,6 +59,17 @@ export async function POST(req: NextRequest) {
     horaFin: horaFin || null,
     diasSemana: diasSemana || null,
     toleranciaMin: toleranciaMin ? parseInt(String(toleranciaMin)) : undefined,
+    tipoDocumento,
+    fechaNacimiento,
+    paisOrigen,
+    direccion,
+    experiencia,
+    aniosExperiencia: aniosExperiencia != null ? Number(aniosExperiencia) : undefined,
+    disponibilidad,
+    portacionArma: portacionArma === true,
+    licenciaConducir: licenciaConducir || undefined,
+    cursoBasicoPolicial: cursoBasicoPolicial === true,
+    horarios,
   });
 
   await registrarAccion(session, "trabajador_creado", "Trabajador", trabajador.id, {
