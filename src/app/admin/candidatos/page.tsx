@@ -7,6 +7,8 @@ import { Candidato, tipoDocLabels } from "@/types/models";
 import CandidatoModal from "@/components/admin/CandidatoModal";
 import Paginacion from "@/components/Paginacion";
 import BuscadorTexto from "@/components/admin/BuscadorTexto";
+import { TableSkeleton } from "@/components/Skeleton";
+import Breadcrumb from "@/components/admin/Breadcrumb";
 
 interface PaginatedResponse {
   data: Candidato[];
@@ -95,10 +97,24 @@ export default function CandidatosPage() {
     );
   }, []);
 
+  const eliminarCandidato = useCallback(async (id: string, nombre: string) => {
+    if (!confirm(`¿Estas seguro de eliminar al candidato ${nombre}? Esta accion no se puede deshacer.`)) return;
+    const res = await fetch(`/api/candidatos/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setCandidatos((prev) => prev.filter((c) => c.id !== id));
+      setTotal((prev) => prev - 1);
+      if (detalle?.id === id) setDetalle(null);
+    }
+  }, [detalle]);
+
   if (status === "loading" || loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <p className="text-gray-400">Cargando...</p>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        <div className="mb-6">
+          <div className="h-8 w-48 animate-pulse rounded bg-gray-200" />
+          <div className="mt-2 h-4 w-32 animate-pulse rounded bg-gray-200" />
+        </div>
+        <TableSkeleton columns={7} rows={5} />
       </div>
     );
   }
@@ -107,6 +123,7 @@ export default function CandidatosPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <Breadcrumb items={[{ label: "Admin", href: "/admin" }, { label: "Candidatos" }]} />
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Candidatos</h1>
@@ -145,8 +162,54 @@ export default function CandidatosPage() {
         />
       )}
 
-      {/* Tabla */}
-      <div className="card overflow-hidden p-0">
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-3">
+        {candidatos.length === 0 ? (
+          <div className="card p-8 text-center text-gray-400">No hay candidatos en esta categoria.</div>
+        ) : (
+          candidatos.map((c) => (
+            <div key={c.id} className="card p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">{c.nombre}</p>
+                  <p className="text-xs text-gray-500">
+                    <span className="uppercase text-gray-400">{tipoDocLabels[c.tipoDocumento] || "Doc"}: </span>
+                    {c.cedula}
+                  </p>
+                </div>
+                <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                  c.estado === "aprobado" ? "bg-green-100 text-green-700" :
+                  c.estado === "rechazado" ? "bg-red-100 text-red-700" :
+                  "bg-yellow-100 text-yellow-700"
+                }`}>
+                  {c.estado}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 capitalize">{c.puesto}</span>
+                <span>{c.atestados.length} docs</span>
+                <span>{new Date(c.createdAt).toLocaleDateString()}</span>
+              </div>
+              <div className="mt-3 flex items-center gap-3 border-t border-gray-100 pt-3">
+                <button onClick={() => setDetalle(c)} className="text-sm font-medium text-primary-600 hover:text-primary-800">
+                  Ver Detalle
+                </button>
+                {c.estado === "rechazado" && (
+                  <button
+                    onClick={() => eliminarCandidato(c.id, c.nombre)}
+                    className="text-sm font-medium text-red-400 hover:text-red-600"
+                  >
+                    Eliminar
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Tabla (desktop) */}
+      <div className="card hidden md:block overflow-hidden p-0">
         {candidatos.length === 0 ? (
           <div className="p-8 text-center text-gray-400">No hay candidatos en esta categoria.</div>
         ) : (
@@ -154,13 +217,13 @@ export default function CandidatosPage() {
             <table className="w-full">
               <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
                 <tr>
-                  <th className="px-6 py-3">Nombre</th>
-                  <th className="px-6 py-3">Documento</th>
-                  <th className="px-6 py-3">Puesto</th>
-                  <th className="px-6 py-3">Estado</th>
-                  <th className="px-6 py-3">Docs</th>
-                  <th className="px-6 py-3">Fecha</th>
-                  <th className="px-6 py-3">Acciones</th>
+                  <th scope="col" className="px-6 py-3">Nombre</th>
+                  <th scope="col" className="px-6 py-3">Documento</th>
+                  <th scope="col" className="px-6 py-3">Puesto</th>
+                  <th scope="col" className="px-6 py-3">Estado</th>
+                  <th scope="col" className="px-6 py-3">Docs</th>
+                  <th scope="col" className="px-6 py-3">Fecha</th>
+                  <th scope="col" className="px-6 py-3">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -184,9 +247,19 @@ export default function CandidatosPage() {
                     <td className="px-6 py-4 text-sm text-gray-500">{c.atestados.length}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{new Date(c.createdAt).toLocaleDateString()}</td>
                     <td className="px-6 py-4">
-                      <button onClick={() => setDetalle(c)} className="text-sm font-medium text-primary-600 hover:text-primary-800">
-                        Ver Detalle
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => setDetalle(c)} className="text-sm font-medium text-primary-600 hover:text-primary-800">
+                          Ver Detalle
+                        </button>
+                        {c.estado === "rechazado" && (
+                          <button
+                            onClick={() => eliminarCandidato(c.id, c.nombre)}
+                            className="text-sm font-medium text-red-400 hover:text-red-600"
+                          >
+                            Eliminar
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

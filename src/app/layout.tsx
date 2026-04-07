@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { Providers } from "@/components/Providers";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -38,7 +39,9 @@ export default function RootLayout({
             Saltar al contenido principal
           </a>
           <Navbar />
-          <main id="main-content" className="min-h-screen">{children}</main>
+          <main id="main-content" className="min-h-screen">
+            <ErrorBoundary>{children}</ErrorBoundary>
+          </main>
           <footer className="border-t border-gray-200 bg-primary-700 py-8 text-center text-sm text-primary-200" role="contentinfo">
             <p>&copy; 2026 DDK Internacional. Todos los derechos reservados.</p>
           </footer>

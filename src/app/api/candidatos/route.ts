@@ -7,6 +7,9 @@ import {
   subirAtestados,
 } from "@/services/candidato.service";
 import { crearNotificacion } from "@/services/notificacion.service";
+import { candidatoCreateSchema } from "@/lib/validations";
+import { uploadLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
+import { errorTracker } from "@/lib/error-tracking";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -26,33 +29,46 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+  const { success } = uploadLimiter.check(10, ip);
+  if (!success) return rateLimitResponse();
+
   try {
     const formData = await req.formData();
 
-    const nombre = formData.get("nombre") as string;
-    const tipoDocumento = (formData.get("tipoDocumento") as string) || "cedula";
-    const cedula = formData.get("cedula") as string;
-    const email = formData.get("email") as string;
-    const telefono = formData.get("telefono") as string;
-    const direccion = formData.get("direccion") as string;
-    const puesto = formData.get("puesto") as string;
+    const rawData = {
+      nombre: formData.get("nombre") as string,
+      tipoDocumento: (formData.get("tipoDocumento") as string) || "cedula",
+      cedula: formData.get("cedula") as string,
+      email: formData.get("email") as string,
+      telefono: formData.get("telefono") as string,
+      direccion: formData.get("direccion") as string,
+      puesto: formData.get("puesto") as string,
+      aniosExperiencia: parseInt(formData.get("aniosExperiencia") as string) || 0,
+      paisOrigen: (formData.get("paisOrigen") as string) || undefined,
+    };
+
+    const validated = candidatoCreateSchema.safeParse(rawData);
+    if (!validated.success) {
+      return NextResponse.json(
+        { error: validated.error.issues.map((i) => i.message).join(", ") },
+        { status: 400 }
+      );
+    }
+
+    const { nombre, tipoDocumento, cedula, email, telefono, direccion, puesto, aniosExperiencia, paisOrigen } = validated.data;
     const experiencia = formData.get("experiencia") as string;
     const disponibilidad = formData.get("disponibilidad") as string;
-    const aniosExperiencia = parseInt(formData.get("aniosExperiencia") as string) || 0;
     const portacionArma = formData.get("portacionArma") === "true";
     const licenciaConducir = (formData.get("licenciaConducir") as string) || null;
     const cursoBasicoPolicial = formData.get("cursoBasicoPolicial") === "true";
     const fechaNacimientoStr = formData.get("fechaNacimiento") as string;
     const fechaNacimiento = fechaNacimientoStr ? new Date(fechaNacimientoStr) : undefined;
 
-    if (!nombre || !cedula || !email || !telefono || !direccion || !puesto) {
-      return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
-    }
-
     const candidato = await crearCandidato({
       nombre, tipoDocumento, cedula, email, telefono, direccion, puesto,
       experiencia, disponibilidad, aniosExperiencia,
-      portacionArma, licenciaConducir, cursoBasicoPolicial, fechaNacimiento,
+      portacionArma, licenciaConducir, cursoBasicoPolicial, fechaNacimiento, paisOrigen,
     });
 
     // Subir archivos en paralelo
@@ -70,6 +86,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(candidato, { status: 201 });
   } catch (error) {
+    errorTracker.captureException(error, {
+      route: "/api/candidatos",
+      action: "POST",
+    });
     const message = error instanceof Error ? error.message : "Error desconocido";
     return NextResponse.json({ error: message }, { status: 500 });
   }

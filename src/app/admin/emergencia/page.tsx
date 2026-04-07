@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Candidato, Medalla } from "@/types/models";
+import Breadcrumb from "@/components/admin/Breadcrumb";
 
 interface CandidatoRankeado extends Candidato {
   puntaje: number;
@@ -79,6 +80,7 @@ export default function EmergenciaPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+      <Breadcrumb items={[{ label: "Admin", href: "/admin" }, { label: "Emergencia" }]} />
       {/* Header */}
       <div className="mb-8 rounded-2xl bg-gradient-to-r from-red-600 to-red-800 p-6 text-white">
         <div className="flex items-center gap-4">

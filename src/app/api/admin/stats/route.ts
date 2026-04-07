@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { obtenerStatsAdmin } from "@/services/registro.service";
 
+export const revalidate = 300;
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.role || session.user.role !== "admin") {

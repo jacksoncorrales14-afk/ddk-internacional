@@ -11,7 +11,7 @@ export default function Home() {
             <Image src="/logo.png" alt="DDK Internacional" width={140} height={140} className="mx-auto mb-8" />
             <h1 className="mb-6 text-4xl font-extrabold tracking-tight text-white sm:text-6xl">
               DDK{" "}
-              <span className="text-accent-400">
+              <span className="text-accent-600">
                 Internacional
               </span>
             </h1>

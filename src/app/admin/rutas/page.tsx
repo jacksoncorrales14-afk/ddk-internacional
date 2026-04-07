@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { UBICACIONES } from "@/types/models";
 import { useApiGet } from "@/hooks/useApi";
+import Breadcrumb from "@/components/admin/Breadcrumb";
 
 interface PuntoRuta {
   id: string;
@@ -99,6 +100,7 @@ export default function RutasPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+      <Breadcrumb items={[{ label: "Admin", href: "/admin" }, { label: "Rutas de Ronda" }]} />
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Rutas de Ronda</h1>
         <p className="text-sm text-gray-500">Define los puntos de control que los oficiales deben escanear durante cada ronda</p>

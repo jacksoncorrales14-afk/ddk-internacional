@@ -1,49 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { supabase } from "@/lib/supabase";
-import { Candidato, Medalla } from "@/types/models";
-
-// ─── Scoring y Medallas ───
-
-export function calcularPuntaje(c: {
-  aniosExperiencia: number;
-  portacionArma: boolean;
-  licenciaConducir: string | null;
-  cursoBasicoPolicial: boolean;
-  atestados: { id: string }[];
-}): number {
-  let pts = 0;
-  pts += c.aniosExperiencia * 10;
-  if (c.portacionArma) pts += 25;
-  if (c.licenciaConducir) pts += 20;
-  if (c.cursoBasicoPolicial) pts += 25;
-  if (c.atestados.length >= 3) pts += 20;
-  else if (c.atestados.length >= 1) pts += 10;
-  return pts;
-}
-
-export function getMedalla(c: {
-  portacionArma: boolean;
-  licenciaConducir: string | null;
-  cursoBasicoPolicial: boolean;
-  atestados: { id: string }[];
-  aniosExperiencia: number;
-}): Medalla {
-  const tieneTodo =
-    c.portacionArma &&
-    c.licenciaConducir &&
-    c.cursoBasicoPolicial &&
-    c.atestados.length >= 3 &&
-    c.aniosExperiencia >= 2;
-
-  const tieneBastante =
-    (c.portacionArma || c.licenciaConducir || c.cursoBasicoPolicial) &&
-    c.atestados.length >= 1 &&
-    c.aniosExperiencia >= 1;
-
-  if (tieneTodo) return "oro";
-  if (tieneBastante) return "plata";
-  return "bronce";
-}
+import { supabaseAdmin } from "@/lib/supabase";
+import { Candidato, calcularPuntaje, getMedalla } from "@/types/models";
 
 // ─── Queries ───
 
@@ -114,6 +71,7 @@ export async function crearCandidato(data: {
   cedula: string;
   email: string;
   fechaNacimiento?: Date;
+  paisOrigen?: string;
   telefono: string;
   direccion: string;
   puesto: string;
@@ -146,24 +104,36 @@ export async function subirAtestados(
     const buffer = Buffer.from(await archivo.arrayBuffer());
     const fileName = `${candidatoId}/${Date.now()}-${i}-${archivo.name}`;
 
-    const { error } = await supabase.storage
+    const { error } = await supabaseAdmin.storage
       .from("atestados")
       .upload(fileName, buffer, { contentType: archivo.type });
 
-    if (!error) {
-      const { data: urlData } = supabase.storage
-        .from("atestados")
-        .getPublicUrl(fileName);
-
+    if (error) {
+      console.error(`Error subiendo archivo ${archivo.name}:`, error.message);
+      // Guardar el atestado sin URL de Supabase como fallback
       await prisma.atestado.create({
         data: {
           nombre: archivo.name,
-          url: urlData.publicUrl,
+          url: "",
           tipo,
           candidatoId,
         },
       });
+      return;
     }
+
+    const { data: urlData } = supabaseAdmin.storage
+      .from("atestados")
+      .getPublicUrl(fileName);
+
+    await prisma.atestado.create({
+      data: {
+        nombre: archivo.name,
+        url: urlData.publicUrl,
+        tipo,
+        candidatoId,
+      },
+    });
   });
 
   await Promise.all(uploadPromises);
@@ -174,6 +144,10 @@ export async function actualizarEstadoCandidato(id: string, estado: string) {
     where: { id },
     data: { estado },
   });
+}
+
+export async function eliminarCandidato(id: string) {
+  return prisma.candidato.delete({ where: { id } });
 }
 
 // ─── Emergencia: candidatos rankeados ───

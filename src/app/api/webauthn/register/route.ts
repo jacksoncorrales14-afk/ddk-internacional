@@ -7,6 +7,7 @@ import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
 } from "@simplewebauthn/server";
+import { loginLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 const rpName = "DDK Internacional";
 const rpID = process.env.WEBAUTHN_RP_ID || "localhost";
@@ -74,6 +75,10 @@ export async function GET(req: NextRequest) {
 
 // POST: verificar y guardar credencial
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+  const { success } = loginLimiter.check(5, ip);
+  if (!success) return rateLimitResponse();
+
   const body = await req.json();
   const challenge = req.cookies.get("webauthn_challenge")?.value;
   const trabajadorId = req.cookies.get("webauthn_trabajador_id")?.value;

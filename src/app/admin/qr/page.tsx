@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { UBICACIONES } from "@/types/models";
+import Breadcrumb from "@/components/admin/Breadcrumb";
 
 export default function QRPage() {
   const { data: session, status } = useSession();
@@ -55,6 +56,7 @@ export default function QRPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+      <Breadcrumb items={[{ label: "Admin", href: "/admin" }, { label: "Codigos QR" }]} />
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Codigos QR por Ubicacion</h1>
         <p className="text-sm text-gray-500">Genera e imprime los codigos QR para cada ubicacion. Los trabajadores deben escanearlos para marcar entrada y salida.</p>

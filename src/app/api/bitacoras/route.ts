@@ -23,12 +23,14 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { incidencias, entregaA, ubicacion } = await req.json();
+    const { incidencias, entregaA, ubicacion, tipoIncidencia, severidad } = await req.json();
     const bitacora = await crearBitacora({
       trabajadorId: session.user.id,
       incidencias,
       entregaA,
       ubicacion,
+      tipoIncidencia,
+      severidad,
     });
     return NextResponse.json(bitacora, { status: 201 });
   } catch (error) {

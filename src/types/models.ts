@@ -15,6 +15,8 @@ export interface Candidato {
   email: string;
   telefono: string;
   direccion: string;
+  fechaNacimiento: string | null;
+  paisOrigen: string | null;
   puesto: string;
   experiencia: string;
   aniosExperiencia: number;
@@ -62,6 +64,16 @@ export interface RegistroAdmin extends Registro {
   trabajador: { nombre: string; cedula: string; ubicacion: string };
 }
 
+export interface Jornada {
+  trabajador: string;
+  cedula: string;
+  entrada: string | null;
+  salida: string | null;
+  duracionMin: number;
+}
+
+export type JornadasAgrupadas = Record<string, Jornada[]>;
+
 export interface Ronda {
   id: string;
   fecha: string;
@@ -80,7 +92,50 @@ export interface Bitacora {
   incidencias: string;
   entregaA: string;
   ubicacion: string;
+  tipoIncidencia: string | null;
+  severidad: string;
+  estado: string;
 }
+
+export const TIPOS_INCIDENCIA: { value: string; label: string }[] = [
+  { value: "robo", label: "Robo" },
+  { value: "intrusion", label: "Intrusion" },
+  { value: "dano_equipo", label: "Dano a equipo" },
+  { value: "lesion", label: "Lesion" },
+  { value: "clima", label: "Evento climatico" },
+  { value: "horario", label: "Incidencia de horario" },
+  { value: "otro", label: "Otro" },
+];
+
+export const SEVERIDADES: { value: string; label: string }[] = [
+  { value: "baja", label: "Baja" },
+  { value: "media", label: "Media" },
+  { value: "alta", label: "Alta" },
+  { value: "critica", label: "Critica" },
+];
+
+export const TIPOS_INCIDENCIA_LABELS: Record<string, string> = Object.fromEntries(
+  TIPOS_INCIDENCIA.map((t) => [t.value, t.label])
+);
+
+export const SEVERIDAD_COLORS: Record<string, string> = {
+  baja: "bg-blue-100 text-blue-700",
+  media: "bg-yellow-100 text-yellow-700",
+  alta: "bg-orange-100 text-orange-700",
+  critica: "bg-red-100 text-red-700",
+};
+
+export const ESTADO_BITACORA_COLORS: Record<string, string> = {
+  abierto: "bg-red-100 text-red-700",
+  en_revision: "bg-yellow-100 text-yellow-700",
+  cerrado: "bg-green-100 text-green-700",
+};
+
+export const ESTADO_BITACORA_LABELS: Record<string, string> = {
+  abierto: "Abierto",
+  en_revision: "En revision",
+  cerrado: "Cerrado",
+};
 
 export const UBICACIONES = [
   "Jacaranda",

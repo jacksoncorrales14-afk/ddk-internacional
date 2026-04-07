@@ -3,7 +3,8 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
-import { RegistroAdmin } from "@/types/models";
+import { TIPOS_INCIDENCIA_LABELS, SEVERIDAD_COLORS, ESTADO_BITACORA_COLORS, ESTADO_BITACORA_LABELS } from "@/types/models";
+import type { Jornada, JornadasAgrupadas } from "@/types/models";
 import { useApiGet } from "@/hooks/useApi";
 import FiltroFechas, {
   FiltrosState,
@@ -11,6 +12,7 @@ import FiltroFechas, {
   buildFiltrosQuery,
 } from "@/components/admin/FiltroFechas";
 import AcordeonPuesto from "@/components/admin/AcordeonPuesto";
+import Breadcrumb from "@/components/admin/Breadcrumb";
 
 interface BitacoraAdmin {
   id: string;
@@ -18,6 +20,9 @@ interface BitacoraAdmin {
   incidencias: string;
   entregaA: string;
   ubicacion: string;
+  tipoIncidencia: string | null;
+  severidad: string;
+  estado: string;
   trabajador: { nombre: string; cedula: string };
 }
 
@@ -50,106 +55,6 @@ function formatDuracion(minutos: number): string {
   return `${h}h ${m}m`;
 }
 
-// ─── Agrupar registros en jornadas (entrada + salida) ───
-
-interface Jornada {
-  trabajador: string;
-  cedula: string;
-  entrada: string | null;
-  salida: string | null;
-  duracionMin: number;
-}
-
-function agruparJornadas(registros: RegistroAdmin[]): Record<string, Jornada[]> {
-  // Por ubicacion -> array de jornadas
-  const porUbicacion: Record<string, Jornada[]> = {};
-
-  // Ordenar registros por trabajador + fecha ascendente
-  const ordenados = [...registros].sort((a, b) => {
-    if (a.trabajador.cedula !== b.trabajador.cedula) {
-      return a.trabajador.cedula.localeCompare(b.trabajador.cedula);
-    }
-    return new Date(a.fecha).getTime() - new Date(b.fecha).getTime();
-  });
-
-  // Emparejar entradas con salidas por trabajador
-  const entradasPendientes: Record<string, RegistroAdmin> = {};
-
-  for (const r of ordenados) {
-    const key = r.trabajador.cedula;
-    if (r.tipo === "entrada") {
-      // Si ya habia una entrada sin cerrar, registrarla como jornada abierta
-      if (entradasPendientes[key]) {
-        const prev = entradasPendientes[key];
-        const ubic = prev.ubicacion || prev.trabajador.ubicacion || "Sin ubicacion";
-        if (!porUbicacion[ubic]) porUbicacion[ubic] = [];
-        porUbicacion[ubic].push({
-          trabajador: prev.trabajador.nombre,
-          cedula: prev.trabajador.cedula,
-          entrada: prev.fecha,
-          salida: null,
-          duracionMin: 0,
-        });
-      }
-      entradasPendientes[key] = r;
-    } else if (r.tipo === "salida") {
-      const entrada = entradasPendientes[key];
-      if (entrada) {
-        const ubic = entrada.ubicacion || r.ubicacion || r.trabajador.ubicacion || "Sin ubicacion";
-        const dur = Math.max(
-          0,
-          Math.floor((new Date(r.fecha).getTime() - new Date(entrada.fecha).getTime()) / 60000)
-        );
-        if (!porUbicacion[ubic]) porUbicacion[ubic] = [];
-        porUbicacion[ubic].push({
-          trabajador: entrada.trabajador.nombre,
-          cedula: entrada.trabajador.cedula,
-          entrada: entrada.fecha,
-          salida: r.fecha,
-          duracionMin: dur,
-        });
-        delete entradasPendientes[key];
-      } else {
-        // Salida sin entrada correspondiente - registrarla suelta
-        const ubic = r.ubicacion || r.trabajador.ubicacion || "Sin ubicacion";
-        if (!porUbicacion[ubic]) porUbicacion[ubic] = [];
-        porUbicacion[ubic].push({
-          trabajador: r.trabajador.nombre,
-          cedula: r.trabajador.cedula,
-          entrada: null,
-          salida: r.fecha,
-          duracionMin: 0,
-        });
-      }
-    }
-  }
-
-  // Las entradas que nunca cerraron
-  for (const key of Object.keys(entradasPendientes)) {
-    const r = entradasPendientes[key];
-    const ubic = r.ubicacion || r.trabajador.ubicacion || "Sin ubicacion";
-    if (!porUbicacion[ubic]) porUbicacion[ubic] = [];
-    porUbicacion[ubic].push({
-      trabajador: r.trabajador.nombre,
-      cedula: r.trabajador.cedula,
-      entrada: r.fecha,
-      salida: null,
-      duracionMin: 0,
-    });
-  }
-
-  // Dentro de cada ubicacion, ordenar por fecha descendente
-  for (const ubic of Object.keys(porUbicacion)) {
-    porUbicacion[ubic].sort((a, b) => {
-      const ta = a.entrada || a.salida || "";
-      const tb = b.entrada || b.salida || "";
-      return new Date(tb).getTime() - new Date(ta).getTime();
-    });
-  }
-
-  return porUbicacion;
-}
-
 // ─── Agrupar rondas por ubicacion ───
 
 function agruparRondas(rondas: RondaAdmin[]): Record<string, RondaAdmin[]> {
@@ -173,8 +78,8 @@ export default function RegistrosPage() {
   const isAdmin = session?.user?.role === "admin";
   const query = buildFiltrosQuery(filtros);
 
-  const { data: registros } = useApiGet<RegistroAdmin[]>(
-    isAdmin ? `/api/admin/registros?${query}` : null
+  const { data: jornadasAgrupadas } = useApiGet<JornadasAgrupadas>(
+    isAdmin ? `/api/admin/registros?${query}&agrupado=1` : null
   );
   const { data: rondas } = useApiGet<RondaAdmin[]>(
     isAdmin ? `/api/admin/rondas?${query}` : null
@@ -187,7 +92,7 @@ export default function RegistrosPage() {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
 
-  const jornadasPorPuesto = useMemo(() => agruparJornadas(registros || []), [registros]);
+  const jornadasPorPuesto = jornadasAgrupadas || {};
   const rondasPorPuesto = useMemo(() => agruparRondas(rondas || []), [rondas]);
   const bitacorasPorPuesto = useMemo(
     () =>
@@ -215,10 +120,11 @@ export default function RegistrosPage() {
 
   if (!isAdmin) return null;
 
-  const cargando = !registros || !rondas || !bitacoras;
+  const cargando = !jornadasAgrupadas || !rondas || !bitacoras;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <Breadcrumb items={[{ label: "Admin", href: "/admin" }, { label: "Registros" }]} />
       <h1 className="mb-6 text-3xl font-bold text-gray-900">Registros, Rondas y Bitacoras</h1>
 
       <FiltroFechas filtros={filtros} onChange={setFiltros} onExportar={exportar} />
@@ -296,11 +202,11 @@ function TabRegistros({ porPuesto }: { porPuesto: Record<string, Jornada[]> }) {
               <table className="w-full">
                 <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
                   <tr>
-                    <th className="px-5 py-3">Trabajador</th>
-                    <th className="px-5 py-3">Fecha</th>
-                    <th className="px-5 py-3">Entrada</th>
-                    <th className="px-5 py-3">Salida</th>
-                    <th className="px-5 py-3">Duracion</th>
+                    <th scope="col" className="px-5 py-3">Trabajador</th>
+                    <th scope="col" className="px-5 py-3">Fecha</th>
+                    <th scope="col" className="px-5 py-3">Entrada</th>
+                    <th scope="col" className="px-5 py-3">Salida</th>
+                    <th scope="col" className="px-5 py-3">Duracion</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -469,16 +375,21 @@ function TabBitacoras({ porPuesto }: { porPuesto: Record<string, BitacoraAdmin[]
           (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
         );
         const guardias = new Set(lista.map((b) => b.trabajador.cedula)).size;
+        const criticas = lista.filter((b) => b.severidad === "critica" || b.severidad === "alta").length;
+        const abiertas = lista.filter((b) => b.estado === "abierto").length;
+        const color = criticas > 0 ? "red" : abiertas > 0 ? "amber" : "green";
 
         return (
           <AcordeonPuesto
             key={puesto}
             titulo={puesto}
             subtitulo={`Ultima entrega: ${formatFechaCorta(lista[0].fecha)} ${formatHora(lista[0].fecha)}`}
-            color="primary"
+            color={color}
             stats={[
               { label: "Entradas", value: lista.length },
               { label: "Guardias", value: guardias },
+              { label: "Alta/Critica", value: criticas },
+              { label: "Abiertas", value: abiertas },
             ]}
           >
             <div className="divide-y divide-gray-100">
@@ -491,6 +402,19 @@ function TabBitacoras({ porPuesto }: { porPuesto: Record<string, BitacoraAdmin[]
                     </div>
                     <span className="text-xs text-gray-400">
                       {formatFechaCorta(b.fecha)} {"\u2022"} {formatHora(b.fecha)}
+                    </span>
+                  </div>
+                  <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                    {b.tipoIncidencia && (
+                      <span className="inline-flex rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700">
+                        {TIPOS_INCIDENCIA_LABELS[b.tipoIncidencia] || b.tipoIncidencia}
+                      </span>
+                    )}
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${SEVERIDAD_COLORS[b.severidad] || "bg-gray-100 text-gray-600"}`}>
+                      {b.severidad?.charAt(0).toUpperCase() + b.severidad?.slice(1)}
+                    </span>
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${ESTADO_BITACORA_COLORS[b.estado] || "bg-gray-100 text-gray-600"}`}>
+                      {ESTADO_BITACORA_LABELS[b.estado] || b.estado}
                     </span>
                   </div>
                   <p className="mb-2 text-sm text-gray-700">{b.incidencias}</p>

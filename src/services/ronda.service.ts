@@ -172,6 +172,6 @@ export async function listarRondasAdmin(filtros: FiltrosRondas = {}) {
       },
     },
     orderBy: { fecha: "desc" },
-    take: filtros.limit || 500,
+    take: Math.min(filtros.limit || 50, 100),
   });
 }

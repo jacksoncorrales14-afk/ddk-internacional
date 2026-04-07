@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { CardSkeleton } from "@/components/Skeleton";
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
@@ -41,8 +42,12 @@ export default function AdminPage() {
 
   if (status === "loading" || loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <p className="text-gray-400">Cargando...</p>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        <div className="mb-8">
+          <div className="h-8 w-64 animate-pulse rounded bg-gray-200" />
+          <div className="mt-2 h-4 w-40 animate-pulse rounded bg-gray-200" />
+        </div>
+        <CardSkeleton count={3} />
       </div>
     );
   }
@@ -90,7 +95,7 @@ export default function AdminPage() {
         className="mb-8 flex items-center justify-center gap-3 rounded-2xl border-2 border-red-200 bg-gradient-to-r from-red-50 to-red-100 p-6 transition-all hover:border-red-400 hover:shadow-lg"
       >
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-600 shadow-lg">
-          <svg className="h-7 w-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-7 w-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
           </svg>
         </div>
@@ -104,7 +109,7 @@ export default function AdminPage() {
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <Link href="/admin/candidatos" className="card group">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary-100">
-            <svg className="h-6 w-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-6 w-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </div>
@@ -114,7 +119,7 @@ export default function AdminPage() {
 
         <Link href="/admin/trabajadores" className="card group">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-accent-100">
-            <svg className="h-6 w-6 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-6 w-6 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
           </div>
@@ -124,7 +129,7 @@ export default function AdminPage() {
 
         <Link href="/admin/registros" className="card group">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-green-100">
-            <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
@@ -134,7 +139,7 @@ export default function AdminPage() {
 
         <Link href="/admin/qr" className="card group">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100">
-            <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
             </svg>
           </div>
@@ -144,7 +149,7 @@ export default function AdminPage() {
 
         <Link href="/admin/rutas" className="card group">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-teal-100">
-            <svg className="h-6 w-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-6 w-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
             </svg>
           </div>
@@ -154,7 +159,7 @@ export default function AdminPage() {
 
         <Link href="/admin/auditoria" className="card group">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100">
-            <svg className="h-6 w-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-6 w-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>

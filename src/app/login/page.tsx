@@ -134,7 +134,7 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>
+            <div role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>
           )}
 
           {tab === "trabajador" ? (
@@ -202,7 +202,7 @@ export default function LoginPage() {
                 {recuperando ? "Enviando..." : "Olvide mi contraseña"}
               </button>
               {recuperarMsg && (
-                <div className="rounded-lg bg-green-50 p-3 text-sm text-green-600">{recuperarMsg}</div>
+                <div role="alert" className="rounded-lg bg-green-50 p-3 text-sm text-green-600">{recuperarMsg}</div>
               )}
             </form>
           )}

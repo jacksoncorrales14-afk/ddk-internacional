@@ -47,7 +47,7 @@ export default function NotificacionesBell() {
   const { data, mutate } = useSWR<NotifResponse>(
     "/api/admin/notificaciones",
     fetcher,
-    { refreshInterval: 60000 }
+    { refreshInterval: 300000 }
   );
 
   useEffect(() => {

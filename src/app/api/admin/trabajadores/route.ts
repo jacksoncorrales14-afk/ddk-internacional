@@ -6,8 +6,14 @@ import {
   crearTrabajador,
 } from "@/services/trabajador.service";
 import { registrarAccion } from "@/lib/audit";
+import { trabajadorCreateSchema } from "@/lib/validations";
+import { apiLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
+  const ip = getClientIp(req);
+  const { success } = apiLimiter.check(100, ip);
+  if (!success) return rateLimitResponse();
+
   const session = await getServerSession(authOptions);
   if (!session?.user?.role || session.user.role !== "admin") {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -21,20 +27,27 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+  const { success } = apiLimiter.check(100, ip);
+  if (!success) return rateLimitResponse();
+
   const session = await getServerSession(authOptions);
   if (!session?.user?.role || session.user.role !== "admin") {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
   const body = await req.json();
+  const validated = trabajadorCreateSchema.safeParse(body);
+  if (!validated.success) {
+    return NextResponse.json(
+      { error: validated.error.issues.map((i) => i.message).join(", ") },
+      { status: 400 }
+    );
+  }
   const {
     nombre, cedula, email, telefono, puesto, ubicacion,
     horaInicio, horaFin, diasSemana, toleranciaMin,
-  } = body;
-
-  if (!nombre || !cedula || !email || !telefono || !puesto || !ubicacion) {
-    return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
-  }
+  } = validated.data;
 
   const trabajador = await crearTrabajador({
     nombre, cedula, email, telefono, puesto, ubicacion,

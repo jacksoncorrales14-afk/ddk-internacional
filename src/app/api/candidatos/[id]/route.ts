@@ -4,11 +4,13 @@ import { authOptions } from "@/lib/auth";
 import {
   actualizarEstadoCandidato,
   obtenerCandidato,
+  eliminarCandidato,
 } from "@/services/candidato.service";
 import { crearTrabajador } from "@/services/trabajador.service";
 import { prisma } from "@/lib/prisma";
 import { registrarAccion } from "@/lib/audit";
 import { crearNotificacion } from "@/services/notificacion.service";
+import { candidatoUpdateSchema } from "@/lib/validations";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -17,7 +19,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const body = await req.json();
-  const { estado, ubicacion, horaInicio, horaFin, diasSemana, toleranciaMin } = body;
+  const validated = candidatoUpdateSchema.safeParse(body);
+  if (!validated.success) {
+    return NextResponse.json(
+      { error: validated.error.issues.map((i) => i.message).join(", ") },
+      { status: 400 }
+    );
+  }
+  const { estado, ubicacion, horaInicio, horaFin, diasSemana, toleranciaMin } = validated.data;
 
   // RECHAZO: solo actualizar estado + auditoria
   if (estado === "rechazado") {
@@ -98,4 +107,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // Cualquier otro cambio de estado
   const candidato = await actualizarEstadoCandidato(params.id, estado);
   return NextResponse.json({ candidato });
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.role || session.user.role !== "admin") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const candidato = await obtenerCandidato(params.id);
+  if (!candidato) {
+    return NextResponse.json({ error: "Candidato no encontrado" }, { status: 404 });
+  }
+
+  if (candidato.estado !== "rechazado") {
+    return NextResponse.json({ error: "Solo se pueden eliminar candidatos rechazados" }, { status: 400 });
+  }
+
+  await eliminarCandidato(params.id);
+  await registrarAccion(session, "candidato_eliminado", "Candidato", params.id, {
+    nombre: candidato.nombre,
+  });
+
+  return NextResponse.json({ success: true });
 }

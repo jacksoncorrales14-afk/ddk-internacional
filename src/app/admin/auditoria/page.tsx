@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useApiGet, PaginatedResponse } from "@/hooks/useApi";
 import Paginacion from "@/components/Paginacion";
+import Breadcrumb from "@/components/admin/Breadcrumb";
 
 interface AuditoriaItem {
   id: string;
@@ -66,6 +67,7 @@ export default function AuditoriaPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <Breadcrumb items={[{ label: "Admin", href: "/admin" }, { label: "Auditoria" }]} />
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Auditoria</h1>
@@ -139,11 +141,11 @@ export default function AuditoriaPage() {
         <table className="min-w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">Fecha</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">Admin</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">Accion</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">Entidad</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">Detalle</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">Fecha</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">Admin</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">Accion</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">Entidad</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">Detalle</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">

@@ -84,12 +84,22 @@ export async function GET(req: NextRequest) {
     filename = "rondas";
   } else if (tipo === "bitacoras") {
     const data = await listarBitacorasAdmin({ ...filtros, limit: 5000 });
+    const tipoLabels: Record<string, string> = {
+      robo: "Robo", intrusion: "Intrusion", dano_equipo: "Dano a equipo",
+      lesion: "Lesion", clima: "Evento climatico", horario: "Incidencia de horario", otro: "Otro",
+    };
+    const estadoLabels: Record<string, string> = {
+      abierto: "Abierto", en_revision: "En revision", cerrado: "Cerrado",
+    };
     const rows = data.map((b) => ({
       trabajador: b.trabajador.nombre,
       cedula: b.trabajador.cedula,
       ubicacion: b.ubicacion,
       fecha: formatFecha(b.fecha),
       hora: formatHora(b.fecha),
+      tipoIncidencia: b.tipoIncidencia ? (tipoLabels[b.tipoIncidencia] || b.tipoIncidencia) : "",
+      severidad: b.severidad || "media",
+      estado: estadoLabels[b.estado] || b.estado || "abierto",
       incidencias: b.incidencias,
       entregaA: b.entregaA,
     }));
@@ -99,6 +109,9 @@ export async function GET(req: NextRequest) {
       { key: "ubicacion", label: "Ubicacion" },
       { key: "fecha", label: "Fecha" },
       { key: "hora", label: "Hora" },
+      { key: "tipoIncidencia", label: "Tipo Incidencia" },
+      { key: "severidad", label: "Severidad" },
+      { key: "estado", label: "Estado" },
       { key: "incidencias", label: "Incidencias" },
       { key: "entregaA", label: "Entrega a" },
     ]);

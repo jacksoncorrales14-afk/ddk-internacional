@@ -14,78 +14,100 @@ export async function listarTrabajadoresConStats(q?: string) {
     ];
   }
 
-  const trabajadores = await prisma.trabajador.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    include: { _count: { select: { credenciales: true } } },
-  });
+  // Run the Prisma query and the combined raw SQL query in parallel
+  const [trabajadores, registroStats] = await Promise.all([
+    prisma.trabajador.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      include: { _count: { select: { credenciales: true } } },
+    }),
 
-  const ultimosRegistros = await prisma.$queryRaw<
-    { trabajadorId: string; tipo: string; ubicacion: string | null }[]
-  >`
-    SELECT DISTINCT ON ("trabajadorId") "trabajadorId", "tipo", "ubicacion"
-    FROM "RegistroHorario"
-    ORDER BY "trabajadorId", "fecha" DESC
-  `;
-
-  const estadisticas = await prisma.$queryRaw<
-    { trabajadorId: string; diasTrabajados: bigint; horasTotales: number }[]
-  >`
-    SELECT
-      e."trabajadorId",
-      COUNT(DISTINCT DATE(e."fecha")) as "diasTrabajados",
-      COALESCE(SUM(
-        EXTRACT(EPOCH FROM (s."fecha" - e."fecha")) / 3600
-      ), 0) as "horasTotales"
-    FROM "RegistroHorario" e
-    INNER JOIN LATERAL (
-      SELECT "fecha"
-      FROM "RegistroHorario" s
-      WHERE s."trabajadorId" = e."trabajadorId"
-        AND s."tipo" = 'salida'
-        AND s."fecha" > e."fecha"
-      ORDER BY s."fecha" ASC
-      LIMIT 1
-    ) s ON true
-    WHERE e."tipo" = 'entrada'
-    GROUP BY e."trabajadorId"
-  `;
-
-  const ultimoMap = new Map(
-    ultimosRegistros.map((r) => [r.trabajadorId, { tipo: r.tipo, ubicacion: r.ubicacion }])
-  );
-  const statsMap = new Map(
-    estadisticas.map((s) => [
-      s.trabajadorId,
+    // Single raw SQL query combining latest record + work stats using CTEs
+    prisma.$queryRaw<
       {
-        diasTrabajados: Number(s.diasTrabajados),
-        horasTotales: Math.round(Number(s.horasTotales) * 10) / 10,
+        trabajadorId: string;
+        ultimoTipo: string | null;
+        ultimoUbicacion: string | null;
+        diasTrabajados: bigint;
+        horasTotales: number;
+      }[]
+    >`
+      WITH ultimo_registro AS (
+        SELECT DISTINCT ON ("trabajadorId")
+          "trabajadorId",
+          "tipo" AS "ultimoTipo",
+          "ubicacion" AS "ultimoUbicacion"
+        FROM "RegistroHorario"
+        ORDER BY "trabajadorId", "fecha" DESC
+      ),
+      estadisticas AS (
+        SELECT
+          e."trabajadorId",
+          COUNT(DISTINCT DATE(e."fecha")) AS "diasTrabajados",
+          COALESCE(SUM(
+            EXTRACT(EPOCH FROM (s."fecha" - e."fecha")) / 3600
+          ), 0) AS "horasTotales"
+        FROM "RegistroHorario" e
+        INNER JOIN LATERAL (
+          SELECT "fecha"
+          FROM "RegistroHorario" s
+          WHERE s."trabajadorId" = e."trabajadorId"
+            AND s."tipo" = 'salida'
+            AND s."fecha" > e."fecha"
+          ORDER BY s."fecha" ASC
+          LIMIT 1
+        ) s ON true
+        WHERE e."tipo" = 'entrada'
+        GROUP BY e."trabajadorId"
+      )
+      SELECT
+        COALESCE(u."trabajadorId", st."trabajadorId") AS "trabajadorId",
+        u."ultimoTipo",
+        u."ultimoUbicacion",
+        COALESCE(st."diasTrabajados", 0) AS "diasTrabajados",
+        COALESCE(st."horasTotales", 0) AS "horasTotales"
+      FROM ultimo_registro u
+      FULL OUTER JOIN estadisticas st ON u."trabajadorId" = st."trabajadorId"
+    `,
+  ]);
+
+  const statsMap = new Map(
+    registroStats.map((r) => [
+      r.trabajadorId,
+      {
+        ultimoTipo: r.ultimoTipo,
+        ultimoUbicacion: r.ultimoUbicacion,
+        diasTrabajados: Number(r.diasTrabajados),
+        horasTotales: Math.round(Number(r.horasTotales) * 10) / 10,
       },
     ])
   );
 
-  return trabajadores.map((t) => ({
-    id: t.id,
-    nombre: t.nombre,
-    cedula: t.cedula,
-    email: t.email,
-    telefono: t.telefono,
-    puesto: t.puesto,
-    ubicacion: t.ubicacion,
-    activo: t.activo,
-    activado: t.activado,
-    codigoActivacion: t.codigoActivacion,
-    horaInicio: t.horaInicio,
-    horaFin: t.horaFin,
-    diasSemana: t.diasSemana,
-    toleranciaMin: t.toleranciaMin,
-    biometriaRegistrada: t._count.credenciales > 0,
-    createdAt: t.createdAt,
-    enServicio: ultimoMap.get(t.id)?.tipo === "entrada",
-    ubicacionActual: ultimoMap.get(t.id)?.tipo === "entrada" ? ultimoMap.get(t.id)?.ubicacion || null : null,
-    diasTrabajados: statsMap.get(t.id)?.diasTrabajados || 0,
-    horasTotales: statsMap.get(t.id)?.horasTotales || 0,
-  }));
+  return trabajadores.map((t) => {
+    const stats = statsMap.get(t.id);
+    return {
+      id: t.id,
+      nombre: t.nombre,
+      cedula: t.cedula,
+      email: t.email,
+      telefono: t.telefono,
+      puesto: t.puesto,
+      ubicacion: t.ubicacion,
+      activo: t.activo,
+      activado: t.activado,
+      codigoActivacion: t.codigoActivacion,
+      horaInicio: t.horaInicio,
+      horaFin: t.horaFin,
+      diasSemana: t.diasSemana,
+      toleranciaMin: t.toleranciaMin,
+      biometriaRegistrada: t._count.credenciales > 0,
+      createdAt: t.createdAt,
+      enServicio: stats?.ultimoTipo === "entrada",
+      ubicacionActual: stats?.ultimoTipo === "entrada" ? stats.ultimoUbicacion || null : null,
+      diasTrabajados: stats?.diasTrabajados || 0,
+      horasTotales: stats?.horasTotales || 0,
+    };
+  });
 }
 
 function generarCodigoActivacion(): string {
@@ -149,6 +171,18 @@ export async function marcarActivado(id: string) {
   });
 }
 
+export async function revocarBiometria(id: string) {
+  // Delete all WebAuthn credentials for this trabajador
+  await prisma.webAuthnCredential.deleteMany({ where: { trabajadorId: id } });
+
+  // Regenerate activation code and set activado=false so they can re-register
+  const codigoActivacion = generarCodigoActivacion();
+  return prisma.trabajador.update({
+    where: { id },
+    data: { activado: false, codigoActivacion },
+  });
+}
+
 export async function eliminarTrabajador(id: string) {
   return prisma.trabajador.delete({ where: { id } });
 }
@@ -190,6 +224,28 @@ export async function detectarAusencias() {
     },
   });
 
+  // Batch-fetch ALL entrada records for today in a single query
+  const trabajadorIds = trabajadores.map((t) => t.id);
+  const entradasHoy = await prisma.registroHorario.findMany({
+    where: {
+      trabajadorId: { in: trabajadorIds },
+      tipo: "entrada",
+      fecha: { gte: inicioDia },
+    },
+    select: { trabajadorId: true },
+  });
+  const trabajadoresConEntrada = new Set(entradasHoy.map((e) => e.trabajadorId));
+
+  // Batch-fetch ALL "trabajador_ausente" notifications created today in a single query
+  const notificacionesHoy = await prisma.notificacion.findMany({
+    where: {
+      tipo: "trabajador_ausente",
+      createdAt: { gte: inicioDia },
+    },
+    select: { mensaje: true },
+  });
+  const mensajesNotificados = new Set(notificacionesHoy.map((n) => n.mensaje));
+
   const ausentes: { id: string; nombre: string; ubicacion: string }[] = [];
 
   for (const t of trabajadores) {
@@ -204,36 +260,23 @@ export async function detectarAusencias() {
     // Solo evaluamos despues de la hora de inicio + tolerancia
     if (minutosActuales < limite) continue;
 
-    // Verificar si ya marco entrada hoy
-    const entradaHoy = await prisma.registroHorario.findFirst({
-      where: {
-        trabajadorId: t.id,
-        tipo: "entrada",
-        fecha: { gte: inicioDia },
-      },
-    });
-
-    if (!entradaHoy) {
+    // Verificar si ya marco entrada hoy (from pre-fetched set)
+    if (!trabajadoresConEntrada.has(t.id)) {
       ausentes.push({ id: t.id, nombre: t.nombre, ubicacion: t.ubicacion });
     }
   }
 
-  // Crear notificaciones (sin duplicados del mismo dia)
+  // Crear notificaciones (sin duplicados del mismo dia, checked against pre-fetched set)
   const link = "/admin/trabajadores";
   for (const a of ausentes) {
-    const ya = await prisma.notificacion.findFirst({
-      where: {
-        tipo: "trabajador_ausente",
-        mensaje: { contains: a.nombre },
-        createdAt: { gte: inicioDia },
-      },
-    });
-    if (!ya) {
+    const mensajeEsperado = `${a.nombre} no ha marcado entrada hoy en ${a.ubicacion}.`;
+    const yaNotificado = Array.from(mensajesNotificados).some((msg) => msg.includes(a.nombre));
+    if (!yaNotificado) {
       await prisma.notificacion.create({
         data: {
           tipo: "trabajador_ausente",
           titulo: "Trabajador ausente",
-          mensaje: `${a.nombre} no ha marcado entrada hoy en ${a.ubicacion}.`,
+          mensaje: mensajeEsperado,
           link,
         },
       });

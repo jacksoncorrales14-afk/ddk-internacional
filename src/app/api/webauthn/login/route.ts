@@ -4,6 +4,7 @@ import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
+import { loginLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 const rpID = process.env.WEBAUTHN_RP_ID || "localhost";
 const origin = process.env.NEXTAUTH_URL || "http://localhost:3000";
@@ -28,6 +29,10 @@ export async function GET() {
 
 // POST: verificar autenticacion biometrica
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+  const { success } = loginLimiter.check(5, ip);
+  if (!success) return rateLimitResponse();
+
   const body = await req.json();
   const challenge = req.cookies.get("webauthn_auth_challenge")?.value;
 

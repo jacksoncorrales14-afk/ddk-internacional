@@ -18,26 +18,26 @@ model Admin {
 }
 
 model Candidato {
-  id                String   @id @default(cuid())
-  nombre            String
-  tipoDocumento     String   @default("cedula") // "cedula", "pasaporte", "dimex"
-  cedula            String   @unique // numero del documento (cedula, pasaporte o dimex)
-  email             String
-  telefono          String
-  direccion         String
-  fechaNacimiento   DateTime?
-  puesto            String   // "seguridad" o "limpieza"
-  experiencia       String?  @db.Text
-  aniosExperiencia  Int      @default(0)
-  portacionArma     Boolean  @default(false)
-  licenciaConducir  String?  // null = no tiene, o tipo: "B1", "B2", "B3", "B4", "A1", "A2", "A3", "C2", "C3", "D1", "D2", "D3", "E1"
-  cursoBasicoPolicial Boolean @default(false)
-  disponibilidad    String?
-  estado            String   @default("pendiente") // pendiente, aprobado, rechazado
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  atestados Atestado[]
+  id                  String     @id @default(cuid())
+  nombre              String
+  cedula              String     @unique
+  email               String
+  telefono            String
+  direccion           String
+  puesto              String
+  experiencia         String?
+  disponibilidad      String?
+  estado              String     @default("pendiente")
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  aniosExperiencia    Int        @default(0)
+  cursoBasicoPolicial Boolean    @default(false)
+  licenciaConducir    String?
+  portacionArma       Boolean    @default(false)
+  tipoDocumento       String     @default("cedula")
+  fechaNacimiento     DateTime?
+  paisOrigen          String?
+  atestados           Atestado[]
 
   @@index([estado])
   @@index([puesto])
@@ -47,48 +47,48 @@ model Atestado {
   id          String    @id @default(cuid())
   nombre      String
   url         String
-  tipo        String    // cedula, antecedentes, curriculum, etc.
+  tipo        String
   candidatoId String
-  candidato   Candidato @relation(fields: [candidatoId], references: [id], onDelete: Cascade)
   createdAt   DateTime  @default(now())
+  candidato   Candidato @relation(fields: [candidatoId], references: [id], onDelete: Cascade)
+
+  @@index([candidatoId])
 }
 
 model Trabajador {
-  id                String   @id @default(cuid())
-  nombre            String
-  cedula            String   @unique
-  email             String
-  telefono          String
-  puesto            String   // "seguridad" o "limpieza"
-  ubicacion         String   // nombre del puesto/lugar asignado
-  activo            Boolean  @default(true)
-  password          String?  // deprecated - se mantiene por compatibilidad
-  codigoActivacion  String?  @unique // codigo temporal para registro biometrico
-  activado          Boolean  @default(false) // true cuando ya registro biometria
-  // Horario laboral (para deteccion de ausencias)
-  horaInicio        String?  // "06:00"
-  horaFin           String?  // "18:00"
-  diasSemana        String?  // CSV "1,2,3,4,5" (1=lunes, 7=domingo)
-  toleranciaMin     Int      @default(15)
-  createdAt         DateTime @default(now())
-
-  registros    RegistroHorario[]
-  rondas       Ronda[]
-  bitacoras    Bitacora[]
-  credenciales WebAuthnCredential[]
+  id               String               @id @default(cuid())
+  nombre           String
+  cedula           String               @unique
+  email            String
+  telefono         String
+  puesto           String
+  ubicacion        String
+  activo           Boolean              @default(true)
+  password         String?
+  createdAt        DateTime             @default(now())
+  activado         Boolean              @default(false)
+  codigoActivacion String?              @unique
+  diasSemana       String?
+  horaFin          String?
+  horaInicio       String?
+  toleranciaMin    Int                  @default(15)
+  bitacoras        Bitacora[]
+  registros        RegistroHorario[]
+  rondas           Ronda[]
+  credenciales     WebAuthnCredential[]
 
   @@index([activo])
 }
 
 model WebAuthnCredential {
-  id              String     @id @default(cuid())
-  trabajadorId    String
-  trabajador      Trabajador @relation(fields: [trabajadorId], references: [id], onDelete: Cascade)
-  credentialId    String     @unique
-  publicKey       Bytes
-  counter         BigInt     @default(0)
-  deviceName      String?
-  createdAt       DateTime   @default(now())
+  id           String     @id @default(cuid())
+  trabajadorId String
+  credentialId String     @unique
+  publicKey    Bytes
+  counter      BigInt     @default(0)
+  deviceName   String?
+  createdAt    DateTime   @default(now())
+  trabajador   Trabajador @relation(fields: [trabajadorId], references: [id], onDelete: Cascade)
 
   @@index([trabajadorId])
 }
@@ -96,74 +96,75 @@ model WebAuthnCredential {
 model RegistroHorario {
   id           String     @id @default(cuid())
   trabajadorId String
-  trabajador   Trabajador @relation(fields: [trabajadorId], references: [id], onDelete: Cascade)
-  tipo         String     // "entrada" o "salida"
+  tipo         String
   fecha        DateTime   @default(now())
   ubicacion    String?
   nota         String?
+  trabajador   Trabajador @relation(fields: [trabajadorId], references: [id], onDelete: Cascade)
 
   @@index([trabajadorId, fecha])
 }
 
 model PuntoRuta {
-  id        String   @id @default(cuid())
-  nombre    String   // "Entrada Principal", "Parqueo Norte", etc.
-  ubicacion String   // "Jacaranda", "Malinches", etc.
-  orden     Int      // posicion en la ruta (1, 2, 3...)
-  createdAt DateTime @default(now())
-
-  escaneos EscaneoRonda[]
+  id        String         @id @default(cuid())
+  nombre    String
+  ubicacion String
+  orden     Int
+  createdAt DateTime       @default(now())
+  escaneos  EscaneoRonda[]
 
   @@unique([ubicacion, orden])
   @@index([ubicacion])
 }
 
 model Ronda {
-  id            String     @id @default(cuid())
+  id            String         @id @default(cuid())
   trabajadorId  String
-  trabajador    Trabajador @relation(fields: [trabajadorId], references: [id], onDelete: Cascade)
-  fecha         DateTime   @default(now())
+  fecha         DateTime       @default(now())
   ubicacion     String
-  observaciones String?    @db.Text
-  novedades     String?    @db.Text
-  completada    Boolean    @default(false)
-  totalPuntos   Int        @default(0)
-
-  escaneos EscaneoRonda[]
+  observaciones String?
+  novedades     String?
+  completada    Boolean        @default(false)
+  totalPuntos   Int            @default(0)
+  escaneos      EscaneoRonda[]
+  trabajador    Trabajador     @relation(fields: [trabajadorId], references: [id], onDelete: Cascade)
 
   @@index([trabajadorId, fecha])
 }
 
 model EscaneoRonda {
-  id           String    @id @default(cuid())
-  rondaId      String
-  ronda        Ronda     @relation(fields: [rondaId], references: [id], onDelete: Cascade)
-  puntoRutaId  String
-  puntoRuta    PuntoRuta @relation(fields: [puntoRutaId], references: [id], onDelete: Cascade)
-  fecha        DateTime  @default(now())
+  id          String    @id @default(cuid())
+  rondaId     String
+  puntoRutaId String
+  fecha       DateTime  @default(now())
+  puntoRuta   PuntoRuta @relation(fields: [puntoRutaId], references: [id], onDelete: Cascade)
+  ronda       Ronda     @relation(fields: [rondaId], references: [id], onDelete: Cascade)
 
   @@unique([rondaId, puntoRutaId])
   @@index([rondaId])
 }
 
 model Bitacora {
-  id            String     @id @default(cuid())
-  trabajadorId  String
-  trabajador    Trabajador @relation(fields: [trabajadorId], references: [id], onDelete: Cascade)
-  fecha         DateTime   @default(now())
-  incidencias   String     @db.Text
-  entregaA      String     // nombre de la persona a quien se entrega el turno
-  ubicacion     String     @map("puesto") // ubicacion donde ocurrieron las incidencias
+  id             String     @id @default(cuid())
+  trabajadorId   String
+  fecha          DateTime   @default(now())
+  incidencias    String
+  entregaA       String
+  ubicacion      String     @map("puesto")
+  estado         String     @default("abierto")
+  severidad      String     @default("media")
+  tipoIncidencia String?
+  trabajador     Trabajador @relation(fields: [trabajadorId], references: [id], onDelete: Cascade)
 
   @@index([trabajadorId, fecha])
 }
 
 model Notificacion {
   id        String   @id @default(cuid())
-  tipo      String   // "candidato_nuevo" | "ronda_incompleta" | "trabajador_ausente" | "trabajador_creado"
+  tipo      String
   titulo    String
-  mensaje   String   @db.Text
-  link      String?  // ruta interna opcional, e.g. "/admin/candidatos"
+  mensaje   String
+  link      String?
   leida     Boolean  @default(false)
   createdAt DateTime @default(now())
 
@@ -173,11 +174,11 @@ model Notificacion {
 model AuditoriaLog {
   id          String   @id @default(cuid())
   adminId     String
-  adminNombre String   // snapshot para no perder el nombre si el admin se elimina
-  accion      String   // e.g. "candidato_aprobado", "trabajador_creado"
-  entidad     String   // "Candidato" | "Trabajador"
+  adminNombre String
+  accion      String
+  entidad     String
   entidadId   String?
-  detalle     String?  @db.Text // JSON string con contexto adicional
+  detalle     String?
   createdAt   DateTime @default(now())
 
   @@index([createdAt])

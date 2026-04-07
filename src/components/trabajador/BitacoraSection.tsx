@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bitacora, UBICACIONES } from "@/types/models";
+import { Bitacora, UBICACIONES, TIPOS_INCIDENCIA, SEVERIDADES, TIPOS_INCIDENCIA_LABELS, SEVERIDAD_COLORS, ESTADO_BITACORA_COLORS, ESTADO_BITACORA_LABELS } from "@/types/models";
 
 interface BitacoraSectionProps {
   bitacoras: Bitacora[];
@@ -13,7 +13,7 @@ interface BitacoraSectionProps {
 export default function BitacoraSection({ bitacoras, loading, onSuccess, onRefresh }: BitacoraSectionProps) {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({ incidencias: "", entregaA: "", ubicacion: "" });
+  const [form, setForm] = useState({ incidencias: "", entregaA: "", ubicacion: "", tipoIncidencia: "", severidad: "media" });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +25,7 @@ export default function BitacoraSection({ bitacoras, loading, onSuccess, onRefre
     });
     if (res.ok) {
       onSuccess("Bitacora registrada correctamente");
-      setForm({ incidencias: "", entregaA: "", ubicacion: "" });
+      setForm({ incidencias: "", entregaA: "", ubicacion: "", tipoIncidencia: "", severidad: "media" });
       setShowForm(false);
       onRefresh();
     }
@@ -56,6 +56,34 @@ export default function BitacoraSection({ bitacoras, loading, onSuccess, onRefre
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Tipo de incidencia</label>
+              <select
+                value={form.tipoIncidencia}
+                onChange={(e) => setForm({ ...form, tipoIncidencia: e.target.value })}
+                className="input-field"
+              >
+                <option value="">Sin clasificar</option>
+                {TIPOS_INCIDENCIA.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Severidad</label>
+              <select
+                value={form.severidad}
+                onChange={(e) => setForm({ ...form, severidad: e.target.value })}
+                className="input-field"
+                required
+              >
+                {SEVERIDADES.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Incidencias del dia</label>
@@ -94,6 +122,19 @@ export default function BitacoraSection({ bitacoras, loading, onSuccess, onRefre
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-gray-900">{b.ubicacion}</span>
                 <span className="text-xs text-gray-400">{new Date(b.fecha).toLocaleString()}</span>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                {b.tipoIncidencia && (
+                  <span className="inline-flex rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-medium text-gray-700">
+                    {TIPOS_INCIDENCIA_LABELS[b.tipoIncidencia] || b.tipoIncidencia}
+                  </span>
+                )}
+                <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${SEVERIDAD_COLORS[b.severidad] || "bg-gray-100 text-gray-600"}`}>
+                  {b.severidad?.charAt(0).toUpperCase() + b.severidad?.slice(1)}
+                </span>
+                <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${ESTADO_BITACORA_COLORS[b.estado] || "bg-gray-100 text-gray-600"}`}>
+                  {ESTADO_BITACORA_LABELS[b.estado] || b.estado}
+                </span>
               </div>
               <p className="mt-1 text-xs text-gray-600">{b.incidencias}</p>
               <p className="mt-1 text-xs text-primary-600">Entregado a: {b.entregaA}</p>

@@ -19,6 +19,7 @@ export default function AplicarPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [fechaNacimiento, setFechaNacimiento] = useState("");
+  const [tipoDocumento, setTipoDocumento] = useState("cedula");
   const [archivoCV, setArchivoCV] = useState<File | null>(null);
   const [archivoDelincuencia, setArchivoDelincuencia] = useState<File | null>(null);
   const [archivoDocumento, setArchivoDocumento] = useState<File | null>(null);
@@ -75,11 +76,11 @@ export default function AplicarPage() {
       <div className="flex min-h-[70vh] items-center justify-center px-4">
         <div className="card max-w-md text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-            <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="mb-2 text-2xl font-bold text-gray-900">Solicitud Enviada</h2>
+          <h2 className="mb-2 text-2xl font-bold text-gray-900" role="alert">Solicitud Enviada</h2>
           <p className="text-gray-500">
             Tu solicitud ha sido recibida exitosamente. Nuestro equipo revisara tus datos
             y te contactara pronto.
@@ -97,7 +98,7 @@ export default function AplicarPage() {
       </div>
 
       {error && (
-        <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-600">{error}</div>
+        <div role="alert" className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-600">{error}</div>
       )}
 
       <form onSubmit={handleSubmit} className="card space-y-6">
@@ -115,7 +116,13 @@ export default function AplicarPage() {
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Tipo de Documento <span className="text-red-500">*</span>
             </label>
-            <select name="tipoDocumento" className="input-field" required>
+            <select
+              name="tipoDocumento"
+              className="input-field"
+              required
+              value={tipoDocumento}
+              onChange={(e) => setTipoDocumento(e.target.value)}
+            >
               <option value="cedula">Cedula</option>
               <option value="pasaporte">Pasaporte</option>
               <option value="dimex">DIMEX</option>
@@ -136,6 +143,15 @@ export default function AplicarPage() {
             <span className="font-semibold">Importante:</span> Asegurese de seleccionar correctamente el tipo de documento de identificacion y que el numero coincida con el documento fisico. Datos incorrectos pueden retrasar o invalidar su solicitud.
           </p>
         </div>
+
+        {(tipoDocumento === "pasaporte" || tipoDocumento === "dimex") && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Pais de Origen <span className="text-red-500">*</span>
+            </label>
+            <input name="paisOrigen" type="text" className="input-field" placeholder="Ej: Nicaragua, Colombia, Venezuela..." required />
+          </div>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
