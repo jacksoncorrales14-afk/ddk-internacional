@@ -43,7 +43,7 @@ export const candidatoUpdateSchema = z.object({
   horaInicio: z.string().optional(),
   horaFin: z.string().optional(),
   diasSemana: z.string().optional(),
-  toleranciaMin: z.number().optional(),
+  toleranciaMin: z.union([z.number(), z.string().transform(Number)]).optional(),
 });
 
 // POST /api/admin/trabajadores
@@ -59,7 +59,7 @@ export const trabajadorCreateSchema = z.object({
   horaInicio: z.string().optional(),
   horaFin: z.string().optional(),
   diasSemana: z.string().optional(),
-  toleranciaMin: z.number().optional(),
+  toleranciaMin: z.union([z.number(), z.string().transform(Number)]).optional(),
 });
 
 // PATCH /api/admin/trabajadores/[id]
@@ -72,10 +72,11 @@ export const trabajadorUpdateSchema = z.object({
     error: "El puesto debe ser seguridad o limpieza",
   }).optional(),
   ubicacion: z.string().optional(),
-  horaInicio: z.string().optional(),
-  horaFin: z.string().optional(),
+  horaInicio: z.string().nullable().optional(),
+  horaFin: z.string().nullable().optional(),
   diasSemana: z.string().optional(),
-  toleranciaMin: z.number().optional(),
+  toleranciaMin: z.union([z.number(), z.string().transform(Number)]).optional(),
+  activo: z.boolean().optional(),
   regenerarCodigo: z.boolean().optional(),
   revocarBiometria: z.boolean().optional(),
 });
