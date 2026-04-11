@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { actualizarUbicacion, eliminarUbicacion } from "@/services/ubicacion.service";
 import { apiLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
+import { ubicacionUpdateSchema, esIdValido } from "@/lib/validations";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const ip = getClientIp(req);
@@ -15,22 +16,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const { id } = params;
-  const body = await req.json();
-  const data: { nombre?: string; activa?: boolean } = {};
-
-  if (typeof body.nombre === "string" && body.nombre.trim()) {
-    data.nombre = body.nombre.trim();
-  }
-  if (typeof body.activa === "boolean") {
-    data.activa = body.activa;
+  if (!esIdValido(id)) {
+    return NextResponse.json({ error: "ID invalido" }, { status: 400 });
   }
 
-  if (Object.keys(data).length === 0) {
-    return NextResponse.json({ error: "No hay datos para actualizar" }, { status: 400 });
+  const body = await req.json().catch(() => ({}));
+  const validated = ubicacionUpdateSchema.safeParse(body);
+  if (!validated.success) {
+    return NextResponse.json(
+      { error: validated.error.issues.map((i) => i.message).join(", ") },
+      { status: 400 }
+    );
   }
 
   try {
-    const ubicacion = await actualizarUbicacion(id, data);
+    const ubicacion = await actualizarUbicacion(id, validated.data);
     return NextResponse.json(ubicacion);
   } catch (e: unknown) {
     if (e && typeof e === "object" && "code" in e && e.code === "P2002") {
@@ -54,6 +54,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   }
 
   const { id } = params;
+  if (!esIdValido(id)) {
+    return NextResponse.json({ error: "ID invalido" }, { status: 400 });
+  }
 
   try {
     await eliminarUbicacion(id);

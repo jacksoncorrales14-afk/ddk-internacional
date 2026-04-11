@@ -5,6 +5,7 @@ import {
   marcarLeida,
   marcarTodasLeidas,
 } from "@/services/notificacion.service";
+import { notificacionPatchSchema } from "@/lib/validations";
 
 export async function GET() {
   const session = await getAdminSession();
@@ -22,15 +23,22 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const body = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const validated = notificacionPatchSchema.safeParse(body);
+  if (!validated.success) {
+    return NextResponse.json(
+      { error: validated.error.issues.map((i) => i.message).join(", ") },
+      { status: 400 }
+    );
+  }
 
-  if (body.todas) {
+  if (validated.data.todas) {
     await marcarTodasLeidas();
     return NextResponse.json({ success: true });
   }
 
-  if (body.id) {
-    await marcarLeida(body.id);
+  if (validated.data.id) {
+    await marcarLeida(validated.data.id);
     return NextResponse.json({ success: true });
   }
 

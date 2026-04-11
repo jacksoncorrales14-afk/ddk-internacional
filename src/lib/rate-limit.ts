@@ -40,6 +40,7 @@ export default rateLimit;
 export const loginLimiter = rateLimit({ interval: 15 * 60 * 1000, uniqueTokenPerInterval: 500 }); // 15 min window
 export const apiLimiter = rateLimit({ interval: 60 * 1000, uniqueTokenPerInterval: 500 }); // 1 min window
 export const uploadLimiter = rateLimit({ interval: 60 * 1000, uniqueTokenPerInterval: 100 }); // 1 min window
+export const passwordRecoveryLimiter = rateLimit({ interval: 60 * 60 * 1000, uniqueTokenPerInterval: 200 }); // 1 hora
 
 export function getClientIp(req: NextRequest): string {
   return (

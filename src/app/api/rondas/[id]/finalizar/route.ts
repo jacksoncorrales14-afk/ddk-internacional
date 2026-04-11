@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { finalizarRonda } from "@/services/ronda.service";
 import { prisma } from "@/lib/prisma";
 import { crearNotificacion } from "@/services/notificacion.service";
+import { rondaFinalizarSchema, esIdValido } from "@/lib/validations";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -11,9 +12,25 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
+  if (!esIdValido(params.id)) {
+    return NextResponse.json({ error: "ID de ronda invalido" }, { status: 400 });
+  }
+
   try {
-    const { observaciones, novedades } = await req.json();
-    const ronda = await finalizarRonda(params.id, session.user.id, observaciones, novedades);
+    const body = await req.json().catch(() => ({}));
+    const validated = rondaFinalizarSchema.safeParse(body);
+    if (!validated.success) {
+      return NextResponse.json(
+        { error: validated.error.issues.map((i) => i.message).join(", ") },
+        { status: 400 }
+      );
+    }
+    const ronda = await finalizarRonda(
+      params.id,
+      session.user.id,
+      validated.data.observaciones,
+      validated.data.novedades
+    );
 
     // Si la ronda no se completo, notificar al admin
     if (!ronda.completada) {

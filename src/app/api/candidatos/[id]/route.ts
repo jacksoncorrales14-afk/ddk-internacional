@@ -10,7 +10,7 @@ import { crearTrabajador } from "@/services/trabajador.service";
 import { prisma } from "@/lib/prisma";
 import { registrarAccion } from "@/lib/audit";
 import { crearNotificacion } from "@/services/notificacion.service";
-import { candidatoUpdateSchema } from "@/lib/validations";
+import { candidatoUpdateSchema, esIdValido } from "@/lib/validations";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -18,7 +18,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const body = await req.json();
+  if (!esIdValido(params.id)) {
+    return NextResponse.json({ error: "ID invalido" }, { status: 400 });
+  }
+
+  const body = await req.json().catch(() => ({}));
   const validated = candidatoUpdateSchema.safeParse(body);
   if (!validated.success) {
     return NextResponse.json(
@@ -113,6 +117,10 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const session = await getServerSession(authOptions);
   if (!session?.user?.role || session.user.role !== "admin") {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  if (!esIdValido(params.id)) {
+    return NextResponse.json({ error: "ID invalido" }, { status: 400 });
   }
 
   const candidato = await obtenerCandidato(params.id);

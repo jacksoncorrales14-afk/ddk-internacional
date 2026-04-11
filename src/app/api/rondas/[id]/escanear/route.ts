@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { escanearPuntoRonda } from "@/services/ronda.service";
+import { rondaEscanearSchema, esIdValido } from "@/lib/validations";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -9,12 +10,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
+  if (!esIdValido(params.id)) {
+    return NextResponse.json({ error: "ID de ronda invalido" }, { status: 400 });
+  }
+
   try {
-    const { codigoQR } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const validated = rondaEscanearSchema.safeParse(body);
+    if (!validated.success) {
+      return NextResponse.json(
+        { error: validated.error.issues.map((i) => i.message).join(", ") },
+        { status: 400 }
+      );
+    }
     const resultado = await escanearPuntoRonda({
       rondaId: params.id,
       trabajadorId: session.user.id,
-      codigoQR,
+      codigoQR: validated.data.codigoQR,
     });
     return NextResponse.json(resultado);
   } catch (error) {

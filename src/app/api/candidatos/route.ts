@@ -7,7 +7,7 @@ import {
   subirAtestados,
 } from "@/services/candidato.service";
 import { crearNotificacion } from "@/services/notificacion.service";
-import { candidatoCreateSchema } from "@/lib/validations";
+import { candidatoCreateSchema, validarArchivo, MAX_FILES_PER_CANDIDATO } from "@/lib/validations";
 import { uploadLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 import { errorTracker } from "@/lib/error-tracking";
 
@@ -65,15 +65,30 @@ export async function POST(req: NextRequest) {
     const fechaNacimientoStr = formData.get("fechaNacimiento") as string;
     const fechaNacimiento = fechaNacimientoStr ? new Date(fechaNacimientoStr) : undefined;
 
+    // Validar archivos ANTES de crear el candidato para no dejar registros huerfanos
+    const archivos = (formData.getAll("archivos") as File[]).filter((a) => a.size > 0);
+    const tiposArchivo = formData.getAll("tiposArchivo") as string[];
+
+    if (archivos.length > MAX_FILES_PER_CANDIDATO) {
+      return NextResponse.json(
+        { error: `Maximo ${MAX_FILES_PER_CANDIDATO} archivos por candidato` },
+        { status: 400 }
+      );
+    }
+
+    for (const archivo of archivos) {
+      const resultado = validarArchivo(archivo);
+      if (!resultado.ok) {
+        return NextResponse.json({ error: resultado.error }, { status: 400 });
+      }
+    }
+
     const candidato = await crearCandidato({
       nombre, tipoDocumento, cedula, email, telefono, direccion, puesto,
       experiencia, disponibilidad, aniosExperiencia,
       portacionArma, licenciaConducir, cursoBasicoPolicial, fechaNacimiento, paisOrigen,
     });
 
-    // Subir archivos en paralelo
-    const archivos = formData.getAll("archivos") as File[];
-    const tiposArchivo = formData.getAll("tiposArchivo") as string[];
     await subirAtestados(candidato.id, archivos, tiposArchivo);
 
     // Notificar al admin

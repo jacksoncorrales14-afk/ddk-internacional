@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { listarPuntosRuta, crearPuntoRuta } from "@/services/ronda.service";
+import { puntoRutaCreateSchema } from "@/lib/validations";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -21,11 +22,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { nombre, ubicacion, orden } = await req.json();
-    if (!nombre || !ubicacion || orden === undefined) {
-      return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
+    const body = await req.json().catch(() => ({}));
+    const validated = puntoRutaCreateSchema.safeParse(body);
+    if (!validated.success) {
+      return NextResponse.json(
+        { error: validated.error.issues.map((i) => i.message).join(", ") },
+        { status: 400 }
+      );
     }
-    const punto = await crearPuntoRuta({ nombre, ubicacion, orden });
+    const punto = await crearPuntoRuta(validated.data);
     return NextResponse.json(punto, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error desconocido";

@@ -5,6 +5,7 @@ import {
   listarBitacorasTrabajador,
   crearBitacora,
 } from "@/services/registro.service";
+import { bitacoraCreateSchema } from "@/lib/validations";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -23,14 +24,17 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { incidencias, entregaA, ubicacion, tipoIncidencia, severidad } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const validated = bitacoraCreateSchema.safeParse(body);
+    if (!validated.success) {
+      return NextResponse.json(
+        { error: validated.error.issues.map((i) => i.message).join(", ") },
+        { status: 400 }
+      );
+    }
     const bitacora = await crearBitacora({
       trabajadorId: session.user.id,
-      incidencias,
-      entregaA,
-      ubicacion,
-      tipoIncidencia,
-      severidad,
+      ...validated.data,
     });
     return NextResponse.json(bitacora, { status: 201 });
   } catch (error) {

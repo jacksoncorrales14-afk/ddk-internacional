@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { listarUbicaciones, crearUbicacion } from "@/services/ubicacion.service";
 import { apiLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
+import { ubicacionCreateSchema } from "@/lib/validations";
 
 const DEFAULT_UBICACIONES = [
   "Jacaranda",
@@ -45,14 +46,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const nombre = body.nombre?.trim();
-  if (!nombre) {
-    return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 });
+  const body = await req.json().catch(() => ({}));
+  const validated = ubicacionCreateSchema.safeParse(body);
+  if (!validated.success) {
+    return NextResponse.json(
+      { error: validated.error.issues.map((i) => i.message).join(", ") },
+      { status: 400 }
+    );
   }
 
   try {
-    const ubicacion = await crearUbicacion(nombre);
+    const ubicacion = await crearUbicacion(validated.data.nombre);
     return NextResponse.json(ubicacion, { status: 201 });
   } catch (e: unknown) {
     if (e && typeof e === "object" && "code" in e && e.code === "P2002") {

@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { activarTrabajador } from "@/services/trabajador.service";
+import { activarTrabajadorSchema } from "@/lib/validations";
+import { loginLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 // POST: verificar cedula + codigo de activacion
 export async function POST(req: NextRequest) {
-  try {
-    const { cedula, codigo } = await req.json();
+  // Rate-limit: 10 intentos por IP en 15 min (brute-force contra codigos)
+  const ip = getClientIp(req);
+  const { success } = loginLimiter.check(10, ip);
+  if (!success) return rateLimitResponse();
 
-    if (!cedula || !codigo) {
-      return NextResponse.json({ error: "Cedula y codigo son requeridos" }, { status: 400 });
+  try {
+    const body = await req.json().catch(() => ({}));
+    const validated = activarTrabajadorSchema.safeParse(body);
+    if (!validated.success) {
+      return NextResponse.json(
+        { error: validated.error.issues.map((i) => i.message).join(", ") },
+        { status: 400 }
+      );
     }
+    const { cedula, codigo } = validated.data;
 
     const trabajador = await activarTrabajador(cedula, codigo);
 

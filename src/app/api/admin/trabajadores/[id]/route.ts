@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { actualizarTrabajador, regenerarCodigo, revocarBiometria, eliminarTrabajador } from "@/services/trabajador.service";
 import { registrarAccion } from "@/lib/audit";
-import { trabajadorUpdateSchema } from "@/lib/validations";
+import { trabajadorUpdateSchema, esIdValido } from "@/lib/validations";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -11,7 +11,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const raw = await req.json();
+  if (!esIdValido(params.id)) {
+    return NextResponse.json({ error: "ID invalido" }, { status: 400 });
+  }
+
+  const raw = await req.json().catch(() => ({}));
   const validated = trabajadorUpdateSchema.safeParse(raw);
   if (!validated.success) {
     return NextResponse.json(
@@ -51,6 +55,10 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const session = await getServerSession(authOptions);
   if (!session?.user?.role || session.user.role !== "admin") {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  if (!esIdValido(params.id)) {
+    return NextResponse.json({ error: "ID invalido" }, { status: 400 });
   }
 
   await eliminarTrabajador(params.id);
