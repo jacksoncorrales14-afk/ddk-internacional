@@ -1,29 +1,21 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+// Credenciales SOLO del servidor. No expuestas al bundle del cliente.
+const supabaseUrl = process.env.SUPABASE_URL || "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 const globalForSupabase = globalThis as unknown as {
-  supabase: SupabaseClient;
   supabaseAdmin: SupabaseClient;
 };
 
-// Cliente publico (para el browser)
-export const supabase: SupabaseClient =
-  globalForSupabase.supabase ||
-  (supabaseUrl
-    ? createClient(supabaseUrl, supabaseAnonKey)
-    : (null as unknown as SupabaseClient));
-
-// Cliente con permisos elevados (solo para el servidor - uploads, etc.)
+// Cliente con permisos elevados (uso exclusivo en el servidor).
+// Bypassea RLS: nunca importar este modulo desde codigo del cliente.
 export const supabaseAdmin: SupabaseClient =
   globalForSupabase.supabaseAdmin ||
   (supabaseUrl && supabaseServiceKey
     ? createClient(supabaseUrl, supabaseServiceKey)
-    : supabase);
+    : (null as unknown as SupabaseClient));
 
 if (process.env.NODE_ENV !== "production") {
-  globalForSupabase.supabase = supabase;
   globalForSupabase.supabaseAdmin = supabaseAdmin;
 }
