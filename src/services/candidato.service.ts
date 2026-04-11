@@ -153,7 +153,7 @@ export async function eliminarCandidato(id: string) {
 // ─── Emergencia: candidatos rankeados ───
 
 export async function listarCandidatosEmergencia(puesto?: string) {
-  const where: Record<string, unknown> = { estado: { not: "rechazado" } };
+  const where: Record<string, unknown> = { estado: "pendiente" };
   if (puesto && puesto !== "todos") where.puesto = puesto;
 
   const candidatos = await prisma.candidato.findMany({

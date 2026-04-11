@@ -21,13 +21,18 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { nombre, ubicacion, orden } = await req.json();
+    const body = await req.json();
+    console.log("[api/puntos-ruta POST] body recibido:", body);
+    const { nombre, ubicacion, orden } = body;
     if (!nombre || !ubicacion || orden === undefined) {
+      console.warn("[api/puntos-ruta POST] faltan campos");
       return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
     }
     const punto = await crearPuntoRuta({ nombre, ubicacion, orden });
+    console.log("[api/puntos-ruta POST] punto creado:", punto);
     return NextResponse.json(punto, { status: 201 });
   } catch (error) {
+    console.error("[api/puntos-ruta POST] error:", error);
     const message = error instanceof Error ? error.message : "Error desconocido";
     return NextResponse.json({ error: message }, { status: 400 });
   }

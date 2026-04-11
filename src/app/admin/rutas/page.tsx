@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Ubicacion } from "@/types/models";
 import { useApiGet } from "@/hooks/useApi";
 import Breadcrumb from "@/components/admin/Breadcrumb";
@@ -22,6 +22,7 @@ export default function RutasPage() {
   const [formLoading, setFormLoading] = useState(false);
   const [nombre, setNombre] = useState("");
   const [qrData, setQrData] = useState<{ nombre: string; qrDataUrl: string } | null>(null);
+  const [formError, setFormError] = useState("");
 
   const isAdmin = session?.user?.role === "admin";
   const { data: ubicacionesData } = useApiGet<Ubicacion[]>(isAdmin ? "/api/admin/ubicaciones" : null);
@@ -34,38 +35,79 @@ export default function RutasPage() {
     }
   }, [ubicacionesNombres, ubicacionSeleccionada]);
 
-  const { data: puntos, mutate } = useApiGet<PuntoRuta[]>(
-    isAdmin && ubicacionSeleccionada ? `/api/admin/puntos-ruta?ubicacion=${encodeURIComponent(ubicacionSeleccionada)}` : null
-  );
+  const puntosKey = isAdmin && ubicacionSeleccionada
+    ? `/api/admin/puntos-ruta?ubicacion=${encodeURIComponent(ubicacionSeleccionada)}`
+    : null;
+  const { data: puntos, mutate } = useApiGet<PuntoRuta[]>(puntosKey);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
 
-  const handleCreate = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormLoading(true);
-    const orden = (puntos?.length || 0) + 1;
+  async function handleCreate(e?: React.FormEvent | React.MouseEvent) {
+    if (e) e.preventDefault();
+    console.log("[rutas] handleCreate invoked", { nombre, ubicacionSeleccionada, puntosLen: puntos?.length });
+    setFormError("");
 
-    const res = await fetch("/api/admin/puntos-ruta", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre, ubicacion: ubicacionSeleccionada, orden }),
-    });
-
-    if (res.ok) {
-      setNombre("");
-      setShowForm(false);
-      mutate();
+    if (!ubicacionSeleccionada) {
+      setFormError("Selecciona una ubicacion antes de agregar un punto");
+      return;
     }
-    setFormLoading(false);
-  }, [nombre, ubicacionSeleccionada, puntos, mutate]);
+    if (!nombre.trim()) {
+      setFormError("El nombre del punto es requerido");
+      return;
+    }
 
-  const handleDelete = useCallback(async (id: string) => {
+    setFormLoading(true);
+
+    const maxOrden = puntos && Array.isArray(puntos) && puntos.length > 0
+      ? Math.max(...puntos.map((p) => p.orden))
+      : 0;
+
+    const payload = {
+      nombre: nombre.trim(),
+      ubicacion: ubicacionSeleccionada,
+      orden: maxOrden + 1,
+    };
+    console.log("[rutas] POST /api/admin/puntos-ruta payload", payload);
+
+    try {
+      const res = await fetch("/api/admin/puntos-ruta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      console.log("[rutas] response status", res.status, res.statusText);
+
+      const raw = await res.text();
+      console.log("[rutas] response body", raw);
+
+      if (res.ok) {
+        setNombre("");
+        setShowForm(false);
+        setFormError("");
+        await mutate();
+      } else {
+        let msg = `Error al crear el punto (${res.status})`;
+        try {
+          const data = JSON.parse(raw);
+          if (data?.error) msg = data.error;
+        } catch { /* raw ya tiene el texto */ }
+        setFormError(msg);
+      }
+    } catch (err) {
+      console.error("[rutas] Error creando punto de ruta:", err);
+      setFormError(`Error de conexion: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setFormLoading(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
     if (!confirm("Eliminar este punto de ruta?")) return;
     await fetch(`/api/admin/puntos-ruta/${id}`, { method: "DELETE" });
-    mutate();
-  }, [mutate]);
+    await mutate();
+  }
 
   const generarQR = async (punto: PuntoRuta) => {
     const params = new URLSearchParams({
@@ -98,7 +140,7 @@ export default function RutasPage() {
     }
   };
 
-  if (status === "loading" || !puntos) {
+  if (status === "loading") {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <p className="text-gray-400">Cargando...</p>
@@ -107,6 +149,8 @@ export default function RutasPage() {
   }
 
   if (!isAdmin) return null;
+
+  const puntosLista = puntos || [];
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
@@ -135,34 +179,55 @@ export default function RutasPage() {
       <div className="card mb-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-900">
-            Puntos de control - {ubicacionSeleccionada}
+            Puntos de control - {ubicacionSeleccionada || "(sin ubicacion)"}
           </h2>
-          <button onClick={() => setShowForm(!showForm)} className="btn-primary text-sm">
+          <button
+            type="button"
+            onClick={() => { setShowForm(!showForm); setFormError(""); }}
+            className="btn-primary text-sm"
+            disabled={!ubicacionSeleccionada}
+          >
             {showForm ? "Cancelar" : "+ Agregar Punto"}
           </button>
         </div>
 
         {showForm && (
-          <form onSubmit={handleCreate} className="mb-4 flex gap-3 rounded-lg bg-gray-50 p-4">
-            <input
-              type="text"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              className="input-field flex-1"
-              placeholder="Nombre del punto (ej: Entrada Principal)"
-              required
-            />
-            <button type="submit" className="btn-primary shrink-0" disabled={formLoading}>
-              {formLoading ? "..." : "Agregar"}
-            </button>
-          </form>
+          <div className="mb-4 rounded-lg bg-gray-50 p-4">
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleCreate();
+                  }
+                }}
+                className="input-field flex-1"
+                placeholder="Nombre del punto (ej: Entrada Principal)"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => handleCreate()}
+                className="btn-primary shrink-0"
+                disabled={formLoading}
+              >
+                {formLoading ? "..." : "Agregar"}
+              </button>
+            </div>
+            {formError && (
+              <p className="mt-2 text-sm text-red-600">{formError}</p>
+            )}
+          </div>
         )}
 
-        {puntos.length === 0 ? (
+        {puntosLista.length === 0 ? (
           <p className="text-sm text-gray-400 py-4 text-center">No hay puntos de ruta definidos para esta ubicacion.</p>
         ) : (
           <div className="space-y-2">
-            {puntos.map((punto, index) => (
+            {puntosLista.map((punto, index) => (
               <div key={punto.id} className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 p-3">
                 <div className="flex items-center gap-3">
                   <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100 text-sm font-bold text-primary-700">
@@ -189,10 +254,10 @@ export default function RutasPage() {
           </div>
         )}
 
-        {puntos.length > 0 && (
+        {puntosLista.length > 0 && (
           <div className="mt-4 rounded-lg bg-primary-50 border border-primary-200 p-3">
             <p className="text-xs text-primary-700">
-              Ruta: {puntos.map((p) => p.nombre).join(" → ")}
+              Ruta: {puntosLista.map((p) => p.nombre).join(" → ")}
             </p>
           </div>
         )}

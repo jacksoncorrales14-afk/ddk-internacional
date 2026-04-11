@@ -16,7 +16,17 @@ export async function crearPuntoRuta(data: {
   ubicacion: string;
   orden: number;
 }) {
-  return prisma.puntoRuta.create({ data });
+  // Buscar el máximo orden existente para evitar conflictos de unique constraint
+  const maxPunto = await prisma.puntoRuta.findFirst({
+    where: { ubicacion: data.ubicacion },
+    orderBy: { orden: "desc" },
+    select: { orden: true },
+  });
+  const safeOrden = Math.max(data.orden, (maxPunto?.orden ?? 0) + 1);
+
+  return prisma.puntoRuta.create({
+    data: { ...data, orden: safeOrden },
+  });
 }
 
 export async function actualizarPuntoRuta(id: string, data: { nombre?: string; orden?: number }) {
