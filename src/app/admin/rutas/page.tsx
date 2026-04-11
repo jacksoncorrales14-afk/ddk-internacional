@@ -46,7 +46,6 @@ export default function RutasPage() {
 
   async function handleCreate(e?: React.FormEvent | React.MouseEvent) {
     if (e) e.preventDefault();
-    console.log("[rutas] handleCreate invoked", { nombre, ubicacionSeleccionada, puntosLen: puntos?.length });
     setFormError("");
 
     if (!ubicacionSeleccionada) {
@@ -64,23 +63,16 @@ export default function RutasPage() {
       ? Math.max(...puntos.map((p) => p.orden))
       : 0;
 
-    const payload = {
-      nombre: nombre.trim(),
-      ubicacion: ubicacionSeleccionada,
-      orden: maxOrden + 1,
-    };
-    console.log("[rutas] POST /api/admin/puntos-ruta payload", payload);
-
     try {
       const res = await fetch("/api/admin/puntos-ruta", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          nombre: nombre.trim(),
+          ubicacion: ubicacionSeleccionada,
+          orden: maxOrden + 1,
+        }),
       });
-      console.log("[rutas] response status", res.status, res.statusText);
-
-      const raw = await res.text();
-      console.log("[rutas] response body", raw);
 
       if (res.ok) {
         setNombre("");
@@ -88,15 +80,10 @@ export default function RutasPage() {
         setFormError("");
         await mutate();
       } else {
-        let msg = `Error al crear el punto (${res.status})`;
-        try {
-          const data = JSON.parse(raw);
-          if (data?.error) msg = data.error;
-        } catch { /* raw ya tiene el texto */ }
-        setFormError(msg);
+        const data = await res.json().catch(() => null);
+        setFormError(data?.error || `Error al crear el punto (${res.status})`);
       }
     } catch (err) {
-      console.error("[rutas] Error creando punto de ruta:", err);
       setFormError(`Error de conexion: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setFormLoading(false);
