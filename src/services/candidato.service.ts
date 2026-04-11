@@ -92,6 +92,31 @@ export async function crearCandidato(data: {
   return prisma.candidato.create({ data });
 }
 
+// Sanitiza el nombre de archivo para que sea seguro en Supabase Storage.
+// Supabase rechaza tildes, ñ, espacios y varios caracteres especiales.
+function sanitizarNombreArchivo(nombre: string): string {
+  // Separar extensión
+  const lastDot = nombre.lastIndexOf(".");
+  const base = lastDot > 0 ? nombre.slice(0, lastDot) : nombre;
+  const ext = lastDot > 0 ? nombre.slice(lastDot) : "";
+
+  const baseSanitizado = base
+    .normalize("NFD") // separa acentos
+    .replace(/[\u0300-\u036f]/g, "") // quita marcas de acento
+    .replace(/ñ/g, "n")
+    .replace(/Ñ/g, "N")
+    .replace(/[^a-zA-Z0-9._-]/g, "_") // solo caracteres seguros
+    .replace(/_+/g, "_") // colapsa underscores
+    .replace(/^_+|_+$/g, ""); // quita underscores al inicio/fin
+
+  const extSanitizada = ext
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9.]/g, "");
+
+  return (baseSanitizado || "archivo") + extSanitizada;
+}
+
 export async function subirAtestados(
   candidatoId: string,
   archivos: File[],
@@ -102,7 +127,8 @@ export async function subirAtestados(
 
     const tipo = tiposArchivo[i] || "otro";
     const buffer = Buffer.from(await archivo.arrayBuffer());
-    const fileName = `${candidatoId}/${Date.now()}-${i}-${archivo.name}`;
+    const nombreSeguro = sanitizarNombreArchivo(archivo.name);
+    const fileName = `${candidatoId}/${Date.now()}-${i}-${nombreSeguro}`;
 
     const { error } = await supabaseAdmin.storage
       .from("atestados")
@@ -110,15 +136,8 @@ export async function subirAtestados(
 
     if (error) {
       console.error(`Error subiendo archivo ${archivo.name}:`, error.message);
-      // Guardar el atestado sin URL de Supabase como fallback
-      await prisma.atestado.create({
-        data: {
-          nombre: archivo.name,
-          url: "",
-          tipo,
-          candidatoId,
-        },
-      });
+      // No guardar atestado con URL vacia: romperia el link en el admin.
+      // Se omite el registro y el admin vera el conteo reducido + aviso en UI.
       return;
     }
 

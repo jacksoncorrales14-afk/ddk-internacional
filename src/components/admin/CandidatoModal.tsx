@@ -190,24 +190,45 @@ export default function CandidatoModal({ candidato, onClose, onAprobar, onRechaz
                 </div>
               ) : (
                 <div className="mb-4 space-y-2">
-                  {candidato.atestados.map((a) => (
-                    <a
-                      key={a.id}
-                      href={a.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 rounded-lg border border-gray-200 p-3 text-sm transition-colors hover:bg-primary-50"
-                    >
-                      <svg className="h-5 w-5 shrink-0 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-primary-600 truncate">{tipoAtestadoLabels[a.tipo] || a.tipo}</p>
-                        <p className="text-xs text-gray-400 truncate">{a.nombre}</p>
+                  {candidato.atestados.map((a) => {
+                    const urlValida = typeof a.url === "string" && a.url.startsWith("http");
+                    const contenido = (
+                      <>
+                        <svg className="h-5 w-5 shrink-0 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <div className="min-w-0 flex-1">
+                          <p className={`font-medium truncate ${urlValida ? "text-primary-600" : "text-gray-500"}`}>
+                            {tipoAtestadoLabels[a.tipo] || a.tipo}
+                          </p>
+                          <p className="text-xs text-gray-400 truncate">{a.nombre}</p>
+                        </div>
+                        <span className={`shrink-0 text-xs ${urlValida ? "text-gray-400" : "text-amber-600"}`}>
+                          {urlValida ? "Ver" : "No disponible"}
+                        </span>
+                      </>
+                    );
+
+                    return urlValida ? (
+                      <a
+                        key={a.id}
+                        href={a.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 rounded-lg border border-gray-200 p-3 text-sm transition-colors hover:bg-primary-50"
+                      >
+                        {contenido}
+                      </a>
+                    ) : (
+                      <div
+                        key={a.id}
+                        title="El archivo no se pudo cargar correctamente. Pide al candidato que lo suba de nuevo."
+                        className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm cursor-not-allowed"
+                      >
+                        {contenido}
                       </div>
-                      <span className="shrink-0 text-xs text-gray-400">Ver</span>
-                    </a>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
