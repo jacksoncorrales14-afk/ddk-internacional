@@ -39,7 +39,7 @@ export default function QRScanner({ onScan, onError }: QRScannerProps) {
             let puesto = "";
             try {
               const decoded = JSON.parse(atob(decodedText));
-              puesto = decoded.puesto || "";
+              puesto = decoded.puesto || decoded.ubicacion || "";
             } catch {
               // ignore
             }

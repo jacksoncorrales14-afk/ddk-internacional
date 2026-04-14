@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { validarCodigoQR } from "@/lib/qr";
+import { validarCodigoQR, validarCodigoQRRonda } from "@/lib/qr";
 import type { Jornada, JornadasAgrupadas } from "@/types/models";
 
 // ─── Registros Horarios ───
@@ -172,10 +172,16 @@ export async function crearRegistro(data: {
       throw new Error("Debe escanear el codigo QR del puesto");
     }
     const { valid, puesto } = validarCodigoQR(data.codigoQR);
-    if (!valid) {
-      throw new Error("Codigo QR invalido");
+    if (valid) {
+      ubicacion = puesto;
+    } else {
+      // Intentar como QR de ronda (ej: Caseta Principal tambien sirve para marcar entrada)
+      const rondaResult = validarCodigoQRRonda(data.codigoQR);
+      if (!rondaResult.valid) {
+        throw new Error("Codigo QR invalido");
+      }
+      ubicacion = rondaResult.ubicacion;
     }
-    ubicacion = puesto;
   } else {
     // Para salida, usar la ubicacion de la ultima entrada
     const ultimaEntrada = await prisma.registroHorario.findFirst({
