@@ -136,6 +136,7 @@ describe("trabajadorCreateSchema", () => {
   const validTrabajador = {
     nombre: "Maria Lopez",
     cedula: "9876543",
+    password: "pass1234",
     email: "maria@example.com",
     telefono: "88887654",
     puesto: "limpieza" as const,
