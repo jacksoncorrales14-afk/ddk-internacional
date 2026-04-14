@@ -38,19 +38,18 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         cedula: { label: "Cedula", type: "text" },
         password: { label: "Password", type: "password" },
-        biometricVerified: { label: "Biometric", type: "text" },
       },
       async authorize(credentials) {
-        if (!credentials?.cedula) return null;
+        if (!credentials?.cedula || !credentials?.password) return null;
 
         const trabajador = await prisma.trabajador.findUnique({
           where: { cedula: credentials.cedula },
         });
 
-        if (!trabajador || !trabajador.activo) return null;
+        if (!trabajador || !trabajador.activo || !trabajador.password) return null;
 
-        // Solo se permite login biometrico
-        if (credentials.biometricVerified !== "true") return null;
+        const valid = await bcrypt.compare(credentials.password, trabajador.password);
+        if (!valid) return null;
 
         return {
           id: trabajador.id,

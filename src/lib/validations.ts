@@ -114,6 +114,7 @@ const horarioDiaSchema = z.object({
 export const trabajadorCreateSchema = z.object({
   nombre: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
   cedula: z.string().min(4, "La cedula debe tener al menos 4 caracteres"),
+  password: z.string().min(4, "La contraseña debe tener al menos 4 caracteres"),
   email: z.string().email("Correo electronico invalido"),
   telefono: z.string().min(7, "El telefono debe tener al menos 7 caracteres"),
   puesto: z.enum(["seguridad", "limpieza"], {
@@ -156,6 +157,7 @@ export const trabajadorUpdateSchema = z.object({
   activo: z.boolean().optional(),
   regenerarCodigo: z.boolean().optional(),
   revocarBiometria: z.boolean().optional(),
+  resetearPassword: z.string().min(4, "La contraseña debe tener al menos 4 caracteres").optional(),
   // Campos equivalentes a Candidato
   tipoDocumento: z.enum(["cedula", "pasaporte", "dimex"]).nullable().optional(),
   fechaNacimiento: z.string().nullable().optional(),

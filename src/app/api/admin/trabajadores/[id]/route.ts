@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { actualizarTrabajador, regenerarCodigo, revocarBiometria, eliminarTrabajador } from "@/services/trabajador.service";
+import { actualizarTrabajador, regenerarCodigo, revocarBiometria, resetearPassword, eliminarTrabajador } from "@/services/trabajador.service";
 import { registrarAccion } from "@/lib/audit";
 import { trabajadorUpdateSchema, esIdValido } from "@/lib/validations";
 
@@ -38,6 +38,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (data.revocarBiometria) {
     const trabajador = await revocarBiometria(params.id);
     await registrarAccion(session, "trabajador_biometria_revocada", "Trabajador", params.id, {
+      nombre: trabajador.nombre,
+    });
+    return NextResponse.json(trabajador);
+  }
+
+  // Resetear contraseña
+  if (data.resetearPassword) {
+    const trabajador = await resetearPassword(params.id, data.resetearPassword);
+    await registrarAccion(session, "trabajador_password_reseteada", "Trabajador", params.id, {
       nombre: trabajador.nombre,
     });
     return NextResponse.json(trabajador);

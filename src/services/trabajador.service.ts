@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { nanoid } from "nanoid";
+import bcrypt from "bcryptjs";
 
 // ─── Queries ───
 
@@ -139,6 +140,7 @@ function generarCodigoActivacion(): string {
 export async function crearTrabajador(data: {
   nombre: string;
   cedula: string;
+  password: string;
   email: string;
   telefono: string;
   puesto: string;
@@ -161,12 +163,13 @@ export async function crearTrabajador(data: {
   // Horarios por dia
   horarios?: { diaSemana: number; horaInicio: string; horaFin: string; toleranciaMin?: number }[];
 }) {
-  const codigoActivacion = generarCodigoActivacion();
+  const hashedPassword = await bcrypt.hash(data.password, 10);
 
   const trabajador = await prisma.trabajador.create({
     data: {
       nombre: data.nombre,
       cedula: data.cedula,
+      password: hashedPassword,
       email: data.email,
       telefono: data.telefono,
       puesto: data.puesto,
@@ -175,7 +178,7 @@ export async function crearTrabajador(data: {
       horaFin: data.horaFin || null,
       diasSemana: data.diasSemana || null,
       toleranciaMin: data.toleranciaMin ?? 15,
-      codigoActivacion,
+      activado: true,
       // Campos equivalentes a Candidato
       tipoDocumento: data.tipoDocumento || null,
       fechaNacimiento: data.fechaNacimiento ? new Date(data.fechaNacimiento) : null,
@@ -229,6 +232,14 @@ export async function marcarActivado(id: string) {
   return prisma.trabajador.update({
     where: { id },
     data: { activado: true, codigoActivacion: null },
+  });
+}
+
+export async function resetearPassword(id: string, newPassword: string) {
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  return prisma.trabajador.update({
+    where: { id },
+    data: { password: hashedPassword },
   });
 }
 

@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     );
   }
   const {
-    nombre, cedula, email, telefono, puesto, ubicacion,
+    nombre, cedula, password, email, telefono, puesto, ubicacion,
     horaInicio, horaFin, diasSemana, toleranciaMin,
     tipoDocumento, fechaNacimiento, paisOrigen, direccion,
     experiencia, aniosExperiencia, disponibilidad,
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   } = validated.data;
 
   const trabajador = await crearTrabajador({
-    nombre, cedula, email, telefono, puesto, ubicacion,
+    nombre, cedula, password, email, telefono, puesto, ubicacion,
     horaInicio: horaInicio || null,
     horaFin: horaFin || null,
     diasSemana: diasSemana || null,

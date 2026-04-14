@@ -193,13 +193,12 @@ interface WorkerComponentProps {
   t: Trabajador;
   abrirEditor: (t: Trabajador) => void;
   toggleActivo: (id: string, activo: boolean) => void;
-  regenerarCodigo: (id: string) => void;
-  revocarBiometria: (id: string, nombre: string) => void;
+  resetearPassword: (id: string, nombre: string) => void;
   handleDelete: (id: string, nombre: string) => void;
   formatearHorario: (t: Trabajador) => string;
 }
 
-function MobileWorkerCard({ t, abrirEditor, toggleActivo, regenerarCodigo, revocarBiometria, handleDelete, formatearHorario }: WorkerComponentProps) {
+function MobileWorkerCard({ t, abrirEditor, toggleActivo, resetearPassword, handleDelete, formatearHorario }: WorkerComponentProps) {
   return (
     <div className="card p-4">
       <div className="flex items-start justify-between">
@@ -208,11 +207,6 @@ function MobileWorkerCard({ t, abrirEditor, toggleActivo, regenerarCodigo, revoc
           <p className="text-xs capitalize text-gray-400">{t.puesto}</p>
         </div>
         <div className="flex items-center gap-1.5">
-          {t.biometriaRegistrada ? (
-            <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Bio</span>
-          ) : (
-            <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Sin Bio</span>
-          )}
           <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
             !t.activo
               ? "bg-gray-100 text-gray-600"
@@ -235,19 +229,14 @@ function MobileWorkerCard({ t, abrirEditor, toggleActivo, regenerarCodigo, revoc
       <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-3">
         <button onClick={() => abrirEditor(t)} className="text-xs font-medium text-primary-600 hover:text-primary-800">Editar</button>
         <button onClick={() => toggleActivo(t.id, t.activo)} className={`text-xs font-medium ${t.activo ? "text-red-600 hover:text-red-800" : "text-green-600 hover:text-green-800"}`}>{t.activo ? "Desactivar" : "Activar"}</button>
-        {!t.biometriaRegistrada && (
-          <button onClick={() => regenerarCodigo(t.id)} className="text-xs font-medium text-primary-600 hover:text-primary-800">Codigo</button>
-        )}
-        {t.biometriaRegistrada && (
-          <button onClick={() => revocarBiometria(t.id, t.nombre)} className="text-xs font-medium text-amber-600 hover:text-amber-800">Revocar Bio</button>
-        )}
+        <button onClick={() => resetearPassword(t.id, t.nombre)} className="text-xs font-medium text-amber-600 hover:text-amber-800">Resetear Contraseña</button>
         <button onClick={() => handleDelete(t.id, t.nombre)} className="text-xs font-medium text-red-400 hover:text-red-600">Eliminar</button>
       </div>
     </div>
   );
 }
 
-function WorkerTableRow({ t, abrirEditor, toggleActivo, regenerarCodigo, revocarBiometria, handleDelete, formatearHorario }: WorkerComponentProps) {
+function WorkerTableRow({ t, abrirEditor, toggleActivo, resetearPassword, handleDelete, formatearHorario }: WorkerComponentProps) {
   return (
     <tr className="hover:bg-gray-50">
       <td className="px-3 py-3">
@@ -262,13 +251,6 @@ function WorkerTableRow({ t, abrirEditor, toggleActivo, regenerarCodigo, revocar
         <button onClick={() => abrirEditor(t)} className="text-primary-600 hover:text-primary-800">
           {formatearHorario(t)}
         </button>
-      </td>
-      <td className="px-3 py-3 text-center">
-        {t.biometriaRegistrada ? (
-          <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Si</span>
-        ) : (
-          <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">No</span>
-        )}
       </td>
       <td className="px-3 py-3 text-center">
         <div>
@@ -295,12 +277,7 @@ function WorkerTableRow({ t, abrirEditor, toggleActivo, regenerarCodigo, revocar
             <button onClick={() => toggleActivo(t.id, t.activo)} className={`text-xs font-medium ${t.activo ? "text-red-600 hover:text-red-800" : "text-green-600 hover:text-green-800"}`}>{t.activo ? "Desactivar" : "Activar"}</button>
           </div>
           <div className="flex items-center gap-2">
-            {!t.biometriaRegistrada && (
-              <button onClick={() => regenerarCodigo(t.id)} className="text-xs font-medium text-primary-600 hover:text-primary-800">Codigo</button>
-            )}
-            {t.biometriaRegistrada && (
-              <button onClick={() => revocarBiometria(t.id, t.nombre)} className="text-xs font-medium text-amber-600 hover:text-amber-800">Revocar Bio</button>
-            )}
+            <button onClick={() => resetearPassword(t.id, t.nombre)} className="text-xs font-medium text-amber-600 hover:text-amber-800">Resetear Contraseña</button>
             <button onClick={() => handleDelete(t.id, t.nombre)} className="text-xs font-medium text-red-400 hover:text-red-600">Eliminar</button>
           </div>
         </div>
@@ -314,7 +291,7 @@ export default function TrabajadoresPage() {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
-  const [codigoMostrado, setCodigoMostrado] = useState<{ nombre: string; codigo: string } | null>(null);
+  const [passwordMostrada, setPasswordMostrada] = useState<{ nombre: string; password: string } | null>(null);
   const [q, setQ] = useState("");
   const [editando, setEditando] = useState<Trabajador | null>(null);
   const [diasSeleccionados, setDiasSeleccionados] = useState<string[]>([]);
@@ -384,6 +361,7 @@ export default function TrabajadoresPage() {
     // Basic fields
     data.nombre = form.get("nombre") as string;
     data.cedula = form.get("cedula") as string;
+    data.password = form.get("password") as string;
     data.email = form.get("email") as string;
     data.telefono = form.get("telefono") as string;
     data.puesto = form.get("puesto") as string;
@@ -432,9 +410,11 @@ export default function TrabajadoresPage() {
     });
 
     if (res.ok) {
-      const trabajador = await res.json();
+      await res.json();
+      const passwordAsignada = data.password as string;
+      const nombreCreado = data.nombre as string;
       setShowForm(false);
-      setCodigoMostrado({ nombre: trabajador.nombre, codigo: trabajador.codigoActivacion });
+      setPasswordMostrada({ nombre: nombreCreado, password: passwordAsignada });
       setCreateTipoDoc("cedula");
       setCreateHorarios(defaultHorarios());
       mutate();
@@ -457,29 +437,19 @@ export default function TrabajadoresPage() {
     mutate();
   }, [mutate]);
 
-  const revocarBiometria = useCallback(async (id: string, nombre: string) => {
-    if (!confirm(`¿Revocar la biometria de ${nombre}? Se eliminaran todas sus credenciales biometricas y debera registrarse nuevamente con un nuevo codigo de activacion.`)) return;
-    const res = await fetch(`/api/admin/trabajadores/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ revocarBiometria: true }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setCodigoMostrado({ nombre: data.nombre, codigo: data.codigoActivacion });
-      mutate();
+  const resetearPasswordFn = useCallback(async (id: string, nombre: string) => {
+    const nuevaPassword = prompt(`Ingresa la nueva contraseña para ${nombre} (minimo 4 caracteres):`);
+    if (!nuevaPassword || nuevaPassword.length < 4) {
+      if (nuevaPassword !== null) alert("La contraseña debe tener al menos 4 caracteres");
+      return;
     }
-  }, [mutate]);
-
-  const regenerarCodigo = useCallback(async (id: string) => {
     const res = await fetch(`/api/admin/trabajadores/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ regenerarCodigo: true }),
+      body: JSON.stringify({ resetearPassword: nuevaPassword }),
     });
     if (res.ok) {
-      const data = await res.json();
-      setCodigoMostrado({ nombre: data.nombre, codigo: data.codigoActivacion });
+      setPasswordMostrada({ nombre, password: nuevaPassword });
       mutate();
     }
   }, [mutate]);
@@ -608,23 +578,23 @@ export default function TrabajadoresPage() {
         </div>
       )}
 
-      {/* Codigo de activacion generado */}
-      {codigoMostrado && (
+      {/* Contraseña asignada */}
+      {passwordMostrada && (
         <div className="card mb-8 border-2 border-green-300 bg-green-50">
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="text-lg font-bold text-green-800">Codigo de Activacion Generado</h3>
+              <h3 className="text-lg font-bold text-green-800">Contraseña Asignada</h3>
               <p className="text-sm text-green-700 mt-1">
-                Entrega este codigo a <span className="font-semibold">{codigoMostrado.nombre}</span> para que active su cuenta:
+                Entrega estas credenciales a <span className="font-semibold">{passwordMostrada.nombre}</span> para que ingrese al sistema:
               </p>
               <div className="mt-3 inline-block rounded-lg bg-white border-2 border-green-400 px-6 py-3">
-                <span className="font-mono text-2xl font-bold tracking-wider text-green-800">{codigoMostrado.codigo}</span>
+                <span className="font-mono text-2xl font-bold tracking-wider text-green-800">{passwordMostrada.password}</span>
               </div>
               <p className="mt-2 text-xs text-green-600">
-                El trabajador debe ir a la pagina de activacion, ingresar su cedula y este codigo para registrar su biometria.
+                El trabajador debe ingresar con su numero de cedula/pasaporte y esta contraseña.
               </p>
             </div>
-            <button onClick={() => setCodigoMostrado(null)} className="text-green-400 hover:text-green-600" aria-label="Cerrar">
+            <button onClick={() => setPasswordMostrada(null)} className="text-green-400 hover:text-green-600" aria-label="Cerrar">
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -637,7 +607,7 @@ export default function TrabajadoresPage() {
         <form onSubmit={handleCreate} className="card mb-8 space-y-6">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Registrar Trabajador</h2>
-            <p className="text-sm text-gray-500">Al crear el trabajador se generara un codigo de activacion para que registre su acceso biometrico.</p>
+            <p className="text-sm text-gray-500">Asigna una contraseña unica al trabajador para que ingrese con su cedula/pasaporte.</p>
           </div>
 
           {/* Datos personales */}
@@ -664,6 +634,10 @@ export default function TrabajadoresPage() {
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Numero de Documento</label>
                 <input name="cedula" className="input-field" required />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Contraseña de Acceso</label>
+                <input name="password" type="text" className="input-field" required minLength={4} placeholder="Contraseña unica para el trabajador" />
               </div>
               {(createTipoDoc === "pasaporte" || createTipoDoc === "dimex") && (
                 <div>
@@ -935,7 +909,7 @@ export default function TrabajadoresPage() {
               {seccionesAbiertas[ubicacion] !== false && (
                 <div className="space-y-3 mb-4">
                   {workers.map((t) => (
-                    <MobileWorkerCard key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} regenerarCodigo={regenerarCodigo} revocarBiometria={revocarBiometria} handleDelete={handleDelete} formatearHorario={formatearHorario} />
+                    <MobileWorkerCard key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} formatearHorario={formatearHorario} />
                   ))}
                 </div>
               )}
@@ -943,7 +917,7 @@ export default function TrabajadoresPage() {
           ))
         ) : (
           (trabajadoresOrdenados || []).map((t) => (
-            <MobileWorkerCard key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} regenerarCodigo={regenerarCodigo} revocarBiometria={revocarBiometria} handleDelete={handleDelete} formatearHorario={formatearHorario} />
+            <MobileWorkerCard key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} formatearHorario={formatearHorario} />
           ))
         )}
       </div>
@@ -963,7 +937,6 @@ export default function TrabajadoresPage() {
                   <th scope="col" className="px-3 py-3">Cedula</th>
                   <th scope="col" className="px-3 py-3">Ubicacion</th>
                   <th scope="col" className="px-3 py-3">Horario</th>
-                  <th scope="col" className="px-3 py-3 text-center">Bio</th>
                   <th scope="col" className="px-3 py-3 text-center">Estado</th>
                   <th scope="col" className="px-3 py-3 text-center">Dias</th>
                   <th scope="col" className="px-3 py-3 text-center">Horas</th>
@@ -975,7 +948,7 @@ export default function TrabajadoresPage() {
                   gruposPorUbicacion.map(([ubicacion, workers]) => (
                     <>
                       <tr key={`header-${ubicacion}`} className="bg-gray-100 cursor-pointer" onClick={() => toggleSeccion(ubicacion)}>
-                        <td colSpan={9} className="px-3 py-2">
+                        <td colSpan={8} className="px-3 py-2">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-bold text-gray-700">{ubicacion} ({workers.length})</span>
                             <svg className={`h-4 w-4 text-gray-500 transition-transform ${seccionesAbiertas[ubicacion] === false ? "" : "rotate-180"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -983,13 +956,13 @@ export default function TrabajadoresPage() {
                         </td>
                       </tr>
                       {seccionesAbiertas[ubicacion] !== false && workers.map((t) => (
-                        <WorkerTableRow key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} regenerarCodigo={regenerarCodigo} revocarBiometria={revocarBiometria} handleDelete={handleDelete} formatearHorario={formatearHorario} />
+                        <WorkerTableRow key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} formatearHorario={formatearHorario} />
                       ))}
                     </>
                   ))
                 ) : (
                   (trabajadoresOrdenados || []).map((t) => (
-                    <WorkerTableRow key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} regenerarCodigo={regenerarCodigo} revocarBiometria={revocarBiometria} handleDelete={handleDelete} formatearHorario={formatearHorario} />
+                    <WorkerTableRow key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} formatearHorario={formatearHorario} />
                   ))
                 )}
               </tbody>

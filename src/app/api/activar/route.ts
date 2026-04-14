@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { activarTrabajador } from "@/services/trabajador.service";
+import { activarTrabajador, marcarActivado } from "@/services/trabajador.service";
 import { activarTrabajadorSchema } from "@/lib/validations";
 import { loginLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
     const { cedula, codigo } = validated.data;
 
     const trabajador = await activarTrabajador(cedula, codigo);
+    await marcarActivado(trabajador.id);
 
     return NextResponse.json({
       success: true,

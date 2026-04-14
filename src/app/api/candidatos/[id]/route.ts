@@ -8,6 +8,7 @@ import {
 } from "@/services/candidato.service";
 import { crearTrabajador } from "@/services/trabajador.service";
 import { prisma } from "@/lib/prisma";
+import { nanoid } from "nanoid";
 import { registrarAccion } from "@/lib/audit";
 import { crearNotificacion } from "@/services/notificacion.service";
 import { candidatoUpdateSchema, esIdValido } from "@/lib/validations";
@@ -73,9 +74,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       });
     }
 
+    const passwordGenerada = nanoid(8);
     const trabajador = await crearTrabajador({
       nombre: candidato.nombre,
       cedula: candidato.cedula,
+      password: passwordGenerada,
       email: candidato.email,
       telefono: candidato.telefono,
       puesto: candidato.puesto,
@@ -97,14 +100,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     await crearNotificacion({
       tipo: "trabajador_creado",
       titulo: "Nuevo trabajador creado",
-      mensaje: `${trabajador.nombre} fue aprobado y asignado a ${ubicacion}. Codigo: ${trabajador.codigoActivacion}`,
+      mensaje: `${trabajador.nombre} fue aprobado y asignado a ${ubicacion}.`,
       link: "/admin/trabajadores",
     });
 
     return NextResponse.json({
       candidato: actualizado,
       trabajador,
-      codigoActivacion: trabajador.codigoActivacion,
+      passwordAsignada: passwordGenerada,
     });
   }
 
