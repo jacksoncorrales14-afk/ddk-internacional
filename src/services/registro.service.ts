@@ -175,9 +175,9 @@ export async function crearRegistro(data: {
     if (valid) {
       ubicacion = puesto;
     } else {
-      // Intentar como QR de ronda (ej: Caseta Principal tambien sirve para marcar entrada)
+      // Excepcion: QR de ronda de Parques del Sol tambien sirve para marcar entrada
       const rondaResult = validarCodigoQRRonda(data.codigoQR);
-      if (!rondaResult.valid) {
+      if (!rondaResult.valid || !rondaResult.ubicacion.startsWith("Parques del Sol")) {
         throw new Error("Codigo QR invalido");
       }
       ubicacion = rondaResult.ubicacion;
