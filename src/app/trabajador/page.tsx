@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Registro, Bitacora } from "@/types/models";
@@ -51,7 +51,11 @@ export default function TrabajadorPage() {
     });
     const data = await res.json();
     if (res.ok) {
-      setMensaje(`${tipo === "entrada" ? "Entrada" : "Salida"} registrada${scannedPuesto ? ` en ${scannedPuesto}` : ""}`);
+      if (tipo === "salida") {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+      setMensaje(`Entrada registrada${scannedPuesto ? ` en ${scannedPuesto}` : ""}`);
       setNota("");
       setScannedCode("");
       setScannedPuesto("");
