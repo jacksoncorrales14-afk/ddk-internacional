@@ -10,7 +10,7 @@ import Breadcrumb from "@/components/admin/Breadcrumb";
 export default function QRPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [qrData, setQrData] = useState<{ puesto: string; nombreQR?: string; qrDataUrl: string } | null>(null);
+  const [qrData, setQrData] = useState<{ puesto: string; qrDataUrl: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const isAdmin = session?.user?.role === "admin";
   const { data: ubicacionesData } = useApiGet<Ubicacion[]>(isAdmin ? "/api/admin/ubicaciones" : null);
@@ -90,7 +90,7 @@ export default function QRPage() {
 
       {qrData && (
         <div className="mt-8 card text-center">
-          <h2 className="mb-2 text-xl font-bold text-gray-900">{qrData.nombreQR || qrData.puesto}</h2>
+          <h2 className="mb-2 text-xl font-bold text-gray-900">{qrData.puesto}</h2>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={qrData.qrDataUrl} alt={`QR ${qrData.puesto}`} className="mx-auto mb-4" style={{ width: 300, height: 300 }} />
           <div className="flex justify-center gap-3">
