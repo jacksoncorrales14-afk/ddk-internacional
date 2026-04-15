@@ -175,9 +175,15 @@ export async function crearRegistro(data: {
     if (valid) {
       ubicacion = puesto;
     } else {
-      // Excepcion: QR de ronda de Parques del Sol tambien sirve para marcar entrada
+      // Excepcion: QR de ronda de caseta retorno sirve para marcar entrada en estas ubicaciones
+      const UBICACIONES_CON_QR_RONDA = [
+        "Parques del Sol",
+        "Malinches",
+        "Jacaranda",
+        "Fuerte Ventura",
+      ];
       const rondaResult = validarCodigoQRRonda(data.codigoQR);
-      if (!rondaResult.valid || !rondaResult.ubicacion.startsWith("Parques del Sol")) {
+      if (!rondaResult.valid || !UBICACIONES_CON_QR_RONDA.some((u) => rondaResult.ubicacion.startsWith(u))) {
         throw new Error("Codigo QR invalido");
       }
       ubicacion = rondaResult.ubicacion;
