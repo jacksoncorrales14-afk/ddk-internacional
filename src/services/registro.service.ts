@@ -181,6 +181,7 @@ export async function crearRegistro(data: {
         "Malinches",
         "Jacaranda",
         "Fuerte Ventura",
+        "City Place",
       ];
       const rondaResult = validarCodigoQRRonda(data.codigoQR);
       if (!rondaResult.valid || !UBICACIONES_CON_QR_RONDA.some((u) => rondaResult.ubicacion.startsWith(u))) {
