@@ -418,6 +418,9 @@ export default function TrabajadoresPage() {
       setCreateTipoDoc("cedula");
       setCreateHorarios(defaultHorarios());
       mutate();
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      alert(errData.error || "Error al crear el trabajador");
     }
     setFormLoading(false);
   }, [mutate, createHorarios]);
