@@ -46,19 +46,13 @@ export async function POST(req: NextRequest) {
   }
   const {
     nombre, cedula, password, email, telefono, puesto, ubicacion,
-    horaInicio, horaFin, diasSemana, toleranciaMin,
     tipoDocumento, fechaNacimiento, paisOrigen, direccion,
     experiencia, aniosExperiencia, disponibilidad,
     portacionArma, licenciaConducir, cursoBasicoPolicial,
-    horarios,
   } = validated.data;
 
   const trabajador = await crearTrabajador({
     nombre, cedula, password, email, telefono, puesto, ubicacion,
-    horaInicio: horaInicio || null,
-    horaFin: horaFin || null,
-    diasSemana: diasSemana || null,
-    toleranciaMin: toleranciaMin ? parseInt(String(toleranciaMin)) : undefined,
     tipoDocumento,
     fechaNacimiento,
     paisOrigen,
@@ -69,7 +63,6 @@ export async function POST(req: NextRequest) {
     portacionArma: portacionArma === true,
     licenciaConducir: licenciaConducir || undefined,
     cursoBasicoPolicial: cursoBasicoPolicial === true,
-    horarios,
   });
 
   await registrarAccion(session, "trabajador_creado", "Trabajador", trabajador.id, {

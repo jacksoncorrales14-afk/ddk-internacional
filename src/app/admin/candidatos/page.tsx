@@ -67,7 +67,7 @@ export default function CandidatosPage() {
 
   const aprobarCandidato = useCallback(async (
     id: string,
-    datos: { ubicacion: string; horaInicio?: string; horaFin?: string; diasSemana?: string; toleranciaMin?: number }
+    datos: { ubicacion: string }
   ) => {
     const res = await fetch(`/api/candidatos/${id}`, {
       method: "PATCH",

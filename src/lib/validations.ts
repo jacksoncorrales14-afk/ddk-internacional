@@ -97,20 +97,9 @@ export const candidatoUpdateSchema = z.object({
     error: "Estado invalido",
   }),
   ubicacion: z.string().optional(),
-  horaInicio: z.string().optional(),
-  horaFin: z.string().optional(),
-  diasSemana: z.string().optional(),
-  toleranciaMin: z.union([z.number(), z.string().transform(Number)]).optional(),
 });
 
 // POST /api/admin/trabajadores
-const horarioDiaSchema = z.object({
-  diaSemana: z.number().min(1).max(7),
-  horaInicio: z.string().min(1, "Hora inicio requerida"),
-  horaFin: z.string().min(1, "Hora fin requerida"),
-  toleranciaMin: z.union([z.number(), z.string().transform(Number)]).default(15),
-});
-
 export const trabajadorCreateSchema = z.object({
   nombre: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
   cedula: z.string().min(4, "La cedula debe tener al menos 4 caracteres"),
@@ -121,10 +110,6 @@ export const trabajadorCreateSchema = z.object({
     error: "El puesto debe ser seguridad o limpieza",
   }),
   ubicacion: z.string().min(1, "La ubicacion es requerida"),
-  horaInicio: z.string().optional(),
-  horaFin: z.string().optional(),
-  diasSemana: z.string().optional(),
-  toleranciaMin: z.union([z.number(), z.string().transform(Number)]).optional(),
   // Campos equivalentes a Candidato
   tipoDocumento: z.enum(["cedula", "pasaporte", "dimex"]).optional(),
   fechaNacimiento: z.string().optional(),
@@ -136,8 +121,6 @@ export const trabajadorCreateSchema = z.object({
   portacionArma: z.union([z.boolean(), z.string().transform((v) => v === "true")]).optional(),
   licenciaConducir: z.string().optional(),
   cursoBasicoPolicial: z.union([z.boolean(), z.string().transform((v) => v === "true")]).optional(),
-  // Horarios por dia
-  horarios: z.array(horarioDiaSchema).optional(),
 });
 
 // PATCH /api/admin/trabajadores/[id]
@@ -150,10 +133,6 @@ export const trabajadorUpdateSchema = z.object({
     error: "El puesto debe ser seguridad o limpieza",
   }).optional(),
   ubicacion: z.string().optional(),
-  horaInicio: z.string().nullable().optional(),
-  horaFin: z.string().nullable().optional(),
-  diasSemana: z.string().optional(),
-  toleranciaMin: z.union([z.number(), z.string().transform(Number)]).optional(),
   activo: z.boolean().optional(),
   regenerarCodigo: z.boolean().optional(),
   revocarBiometria: z.boolean().optional(),
@@ -169,8 +148,6 @@ export const trabajadorUpdateSchema = z.object({
   portacionArma: z.union([z.boolean(), z.string().transform((v) => v === "true")]).optional(),
   licenciaConducir: z.string().nullable().optional(),
   cursoBasicoPolicial: z.union([z.boolean(), z.string().transform((v) => v === "true")]).optional(),
-  // Horarios por dia
-  horarios: z.array(horarioDiaSchema).optional(),
 });
 
 // POST /api/activar (activacion de trabajador)

@@ -68,11 +68,6 @@ model Trabajador {
   createdAt        DateTime             @default(now())
   activado         Boolean              @default(false)
   codigoActivacion String?              @unique
-  diasSemana       String?
-  horaFin          String?
-  horaInicio       String?
-  toleranciaMin    Int                  @default(15)
-
   // Campos equivalentes a Candidato (opcionales para compatibilidad)
   tipoDocumento       String?
   fechaNacimiento     DateTime?
@@ -86,25 +81,11 @@ model Trabajador {
   cursoBasicoPolicial Boolean   @default(false)
 
   bitacoras        Bitacora[]
-  horarios         HorarioDia[]
   registros        RegistroHorario[]
   rondas           Ronda[]
   credenciales     WebAuthnCredential[]
 
   @@index([activo])
-}
-
-model HorarioDia {
-  id            String     @id @default(cuid())
-  trabajadorId  String
-  trabajador    Trabajador @relation(fields: [trabajadorId], references: [id], onDelete: Cascade)
-  diaSemana     Int        // 1=Lunes, 7=Domingo
-  horaInicio    String     // "06:00"
-  horaFin       String     // "18:00"
-  toleranciaMin Int        @default(15)
-
-  @@unique([trabajadorId, diaSemana])
-  @@index([trabajadorId])
 }
 
 model WebAuthnCredential {

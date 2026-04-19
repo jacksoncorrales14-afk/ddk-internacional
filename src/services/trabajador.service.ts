@@ -22,7 +22,6 @@ export async function listarTrabajadoresConStats(q?: string) {
       orderBy: { createdAt: "desc" },
       include: {
         _count: { select: { credenciales: true } },
-        horarios: { orderBy: { diaSemana: "asc" } },
       },
     }),
 
@@ -100,10 +99,6 @@ export async function listarTrabajadoresConStats(q?: string) {
       activo: t.activo,
       activado: t.activado,
       codigoActivacion: t.codigoActivacion,
-      horaInicio: t.horaInicio,
-      horaFin: t.horaFin,
-      diasSemana: t.diasSemana,
-      toleranciaMin: t.toleranciaMin,
       // Campos equivalentes a Candidato
       tipoDocumento: t.tipoDocumento,
       fechaNacimiento: t.fechaNacimiento,
@@ -115,14 +110,6 @@ export async function listarTrabajadoresConStats(q?: string) {
       portacionArma: t.portacionArma,
       licenciaConducir: t.licenciaConducir,
       cursoBasicoPolicial: t.cursoBasicoPolicial,
-      // Horarios por dia
-      horarios: t.horarios.map((h) => ({
-        id: h.id,
-        diaSemana: h.diaSemana,
-        horaInicio: h.horaInicio,
-        horaFin: h.horaFin,
-        toleranciaMin: h.toleranciaMin,
-      })),
       biometriaRegistrada: t._count.credenciales > 0,
       createdAt: t.createdAt,
       enServicio: stats?.ultimoTipo === "entrada",
@@ -145,10 +132,6 @@ export async function crearTrabajador(data: {
   telefono: string;
   puesto: string;
   ubicacion: string;
-  horaInicio?: string | null;
-  horaFin?: string | null;
-  diasSemana?: string | null;
-  toleranciaMin?: number;
   // Campos equivalentes a Candidato
   tipoDocumento?: string;
   fechaNacimiento?: string;
@@ -160,8 +143,6 @@ export async function crearTrabajador(data: {
   portacionArma?: boolean;
   licenciaConducir?: string;
   cursoBasicoPolicial?: boolean;
-  // Horarios por dia
-  horarios?: { diaSemana: number; horaInicio: string; horaFin: string; toleranciaMin?: number }[];
 }) {
   const hashedPassword = await bcrypt.hash(data.password, 10);
 
@@ -174,10 +155,6 @@ export async function crearTrabajador(data: {
       telefono: data.telefono,
       puesto: data.puesto,
       ubicacion: data.ubicacion,
-      horaInicio: data.horaInicio || null,
-      horaFin: data.horaFin || null,
-      diasSemana: data.diasSemana || null,
-      toleranciaMin: data.toleranciaMin ?? 15,
       activado: true,
       // Campos equivalentes a Candidato
       tipoDocumento: data.tipoDocumento || null,
@@ -192,19 +169,6 @@ export async function crearTrabajador(data: {
       cursoBasicoPolicial: data.cursoBasicoPolicial ?? false,
     },
   });
-
-  // Crear horarios por dia si se proporcionaron
-  if (data.horarios && data.horarios.length > 0) {
-    await prisma.horarioDia.createMany({
-      data: data.horarios.map((h) => ({
-        trabajadorId: trabajador.id,
-        diaSemana: h.diaSemana,
-        horaInicio: h.horaInicio,
-        horaFin: h.horaFin,
-        toleranciaMin: h.toleranciaMin ?? 15,
-      })),
-    });
-  }
 
   return trabajador;
 }
@@ -263,147 +227,14 @@ export async function actualizarTrabajador(
   id: string,
   data: Record<string, unknown>
 ) {
-  // Extract horarios before passing to Prisma update
-  const horarios = data.horarios as { diaSemana: number; horaInicio: string; horaFin: string; toleranciaMin?: number }[] | undefined;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { horarios: _h, ...updateData } = data;
-
   // Convert fechaNacimiento string to Date if present
-  if (typeof updateData.fechaNacimiento === "string") {
-    updateData.fechaNacimiento = new Date(updateData.fechaNacimiento as string);
+  if (typeof data.fechaNacimiento === "string") {
+    data.fechaNacimiento = new Date(data.fechaNacimiento as string);
   }
 
-  const trabajador = await prisma.trabajador.update({
+  return prisma.trabajador.update({
     where: { id },
-    data: updateData,
+    data,
   });
-
-  // Replace horarios if provided
-  if (horarios !== undefined) {
-    await prisma.horarioDia.deleteMany({ where: { trabajadorId: id } });
-    if (horarios.length > 0) {
-      await prisma.horarioDia.createMany({
-        data: horarios.map((h) => ({
-          trabajadorId: id,
-          diaSemana: h.diaSemana,
-          horaInicio: h.horaInicio,
-          horaFin: h.horaFin,
-          toleranciaMin: h.toleranciaMin ?? 15,
-        })),
-      });
-    }
-  }
-
-  return trabajador;
 }
 
-// ─── Deteccion de ausencias ───
-
-function minutosDesdeHora(hhmm: string): number {
-  const [h, m] = hhmm.split(":").map(Number);
-  return h * 60 + m;
-}
-
-/**
- * Detecta trabajadores que deberian estar trabajando (segun horario) pero no han marcado entrada hoy.
- * Crea una notificacion por cada uno, sin duplicar si ya existe una para hoy.
- */
-export async function detectarAusencias() {
-  const ahora = new Date();
-  const diaSemanaNum = ahora.getDay() === 0 ? 7 : ahora.getDay(); // 1..7 lun..dom
-  const diaSemanaStr = String(diaSemanaNum);
-  const minutosActuales = ahora.getHours() * 60 + ahora.getMinutes();
-
-  const inicioDia = new Date(ahora);
-  inicioDia.setHours(0, 0, 0, 0);
-
-  // Trabajadores activos con horario definido (old fields OR new HorarioDia records)
-  const trabajadores = await prisma.trabajador.findMany({
-    where: {
-      activo: true,
-      OR: [
-        { horaInicio: { not: null } },
-        { horarios: { some: {} } },
-      ],
-    },
-    include: {
-      horarios: true,
-    },
-  });
-
-  // Batch-fetch ALL entrada records for today in a single query
-  const trabajadorIds = trabajadores.map((t) => t.id);
-  const entradasHoy = await prisma.registroHorario.findMany({
-    where: {
-      trabajadorId: { in: trabajadorIds },
-      tipo: "entrada",
-      fecha: { gte: inicioDia },
-    },
-    select: { trabajadorId: true },
-  });
-  const trabajadoresConEntrada = new Set(entradasHoy.map((e) => e.trabajadorId));
-
-  // Batch-fetch ALL "trabajador_ausente" notifications created today in a single query
-  const notificacionesHoy = await prisma.notificacion.findMany({
-    where: {
-      tipo: "trabajador_ausente",
-      createdAt: { gte: inicioDia },
-    },
-    select: { mensaje: true },
-  });
-  const mensajesNotificados = new Set(notificacionesHoy.map((n) => n.mensaje));
-
-  const ausentes: { id: string; nombre: string; ubicacion: string }[] = [];
-
-  for (const t of trabajadores) {
-    // Check HorarioDia records first (new system)
-    const horarioDia = t.horarios.find((h) => h.diaSemana === diaSemanaNum);
-
-    if (horarioDia) {
-      // Use per-day schedule
-      const horaInicioMin = minutosDesdeHora(horarioDia.horaInicio);
-      const limite = horaInicioMin + horarioDia.toleranciaMin;
-
-      if (minutosActuales < limite) continue;
-
-      if (!trabajadoresConEntrada.has(t.id)) {
-        ausentes.push({ id: t.id, nombre: t.nombre, ubicacion: t.ubicacion });
-      }
-    } else if (t.horarios.length > 0) {
-      // Worker has HorarioDia records but not for today -> not scheduled today
-      continue;
-    } else if (t.horaInicio) {
-      // Backward compatibility: use old flat fields
-      const dias = (t.diasSemana || "").split(",").filter(Boolean);
-      if (dias.length > 0 && !dias.includes(diaSemanaStr)) continue;
-
-      const horaInicioMin = minutosDesdeHora(t.horaInicio);
-      const limite = horaInicioMin + (t.toleranciaMin ?? 15);
-
-      if (minutosActuales < limite) continue;
-
-      if (!trabajadoresConEntrada.has(t.id)) {
-        ausentes.push({ id: t.id, nombre: t.nombre, ubicacion: t.ubicacion });
-      }
-    }
-  }
-
-  // Crear notificaciones (sin duplicados del mismo dia, checked against pre-fetched set)
-  const link = "/admin/trabajadores";
-  for (const a of ausentes) {
-    const mensajeEsperado = `${a.nombre} no ha marcado entrada hoy en ${a.ubicacion}.`;
-    const yaNotificado = Array.from(mensajesNotificados).some((msg) => msg.includes(a.nombre));
-    if (!yaNotificado) {
-      await prisma.notificacion.create({
-        data: {
-          tipo: "trabajador_ausente",
-          titulo: "Trabajador ausente",
-          mensaje: mensajeEsperado,
-          link,
-        },
-      });
-    }
-  }
-
-  return { ausentes: ausentes.length, detalle: ausentes };
-}

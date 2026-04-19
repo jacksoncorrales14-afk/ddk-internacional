@@ -31,7 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       { status: 400 }
     );
   }
-  const { estado, ubicacion, horaInicio, horaFin, diasSemana, toleranciaMin } = validated.data;
+  const { estado, ubicacion } = validated.data;
 
   // RECHAZO: solo actualizar estado + auditoria
   if (estado === "rechazado") {
@@ -83,10 +83,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       telefono: candidato.telefono,
       puesto: candidato.puesto,
       ubicacion,
-      horaInicio: horaInicio || null,
-      horaFin: horaFin || null,
-      diasSemana: diasSemana || null,
-      toleranciaMin: toleranciaMin ? parseInt(String(toleranciaMin)) : undefined,
     });
 
     const actualizado = await actualizarEstadoCandidato(params.id, "aprobado");

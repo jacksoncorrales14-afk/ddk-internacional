@@ -151,10 +151,8 @@ describe("trabajadorCreateSchema", () => {
   it("accepts trabajador with optional fields", () => {
     const result = trabajadorCreateSchema.safeParse({
       ...validTrabajador,
-      horaInicio: "06:00",
-      horaFin: "14:00",
-      diasSemana: "L,M,Mi,J,V",
-      toleranciaMin: 15,
+      tipoDocumento: "cedula",
+      direccion: "Calle 1",
     });
     expect(result.success).toBe(true);
   });

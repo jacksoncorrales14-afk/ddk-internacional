@@ -27,29 +27,15 @@ interface CandidatoModalProps {
   onClose: () => void;
   onAprobar: (
     id: string,
-    data: { ubicacion: string; horaInicio?: string; horaFin?: string; diasSemana?: string; toleranciaMin?: number }
+    data: { ubicacion: string }
   ) => Promise<{ codigoActivacion?: string } | void>;
   onRechazar: (id: string) => void;
 }
-
-const DIAS = [
-  { value: "1", label: "L" },
-  { value: "2", label: "M" },
-  { value: "3", label: "X" },
-  { value: "4", label: "J" },
-  { value: "5", label: "V" },
-  { value: "6", label: "S" },
-  { value: "7", label: "D" },
-];
 
 export default function CandidatoModal({ candidato, onClose, onAprobar, onRechazar }: CandidatoModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const [modo, setModo] = useState<"detalle" | "aprobacion" | "codigo">("detalle");
   const [ubicacion, setUbicacion] = useState("");
-  const [horaInicio, setHoraInicio] = useState("");
-  const [horaFin, setHoraFin] = useState("");
-  const [diasSeleccionados, setDiasSeleccionados] = useState<string[]>([]);
-  const [toleranciaMin, setToleranciaMin] = useState("15");
   const [loading, setLoading] = useState(false);
   const [codigoGenerado, setCodigoGenerado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,10 +60,6 @@ export default function CandidatoModal({ candidato, onClose, onAprobar, onRechaz
     try {
       const res = await onAprobar(candidato.id, {
         ubicacion,
-        horaInicio: horaInicio || undefined,
-        horaFin: horaFin || undefined,
-        diasSemana: diasSeleccionados.join(",") || undefined,
-        toleranciaMin: parseInt(toleranciaMin) || 15,
       });
       if (res?.codigoActivacion) {
         setCodigoGenerado(res.codigoActivacion);
@@ -277,47 +259,6 @@ export default function CandidatoModal({ candidato, onClose, onAprobar, onRechaz
                   <option key={u} value={u}>{u}</option>
                 ))}
               </select>
-            </div>
-
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <h3 className="mb-3 text-sm font-semibold text-gray-700">Horario laboral (opcional)</h3>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Hora inicio</label>
-                  <input type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} className="input-field" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Hora fin</label>
-                  <input type="time" value={horaFin} onChange={(e) => setHoraFin(e.target.value)} className="input-field" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Tolerancia</label>
-                  <input type="number" value={toleranciaMin} onChange={(e) => setToleranciaMin(e.target.value)} min="0" className="input-field" />
-                </div>
-              </div>
-              <div className="mt-3">
-                <label className="mb-2 block text-xs font-medium text-gray-600">Dias de la semana</label>
-                <div className="flex gap-2">
-                  {DIAS.map((d) => (
-                    <button
-                      type="button"
-                      key={d.value}
-                      onClick={() =>
-                        setDiasSeleccionados((prev) =>
-                          prev.includes(d.value) ? prev.filter((x) => x !== d.value) : [...prev, d.value]
-                        )
-                      }
-                      className={`flex h-9 w-9 items-center justify-center rounded-lg border text-sm font-medium ${
-                        diasSeleccionados.includes(d.value)
-                          ? "border-primary-600 bg-primary-600 text-white"
-                          : "border-gray-300 bg-white text-gray-600"
-                      }`}
-                    >
-                      {d.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
             {error && <p className="text-sm text-red-600">{error}</p>}

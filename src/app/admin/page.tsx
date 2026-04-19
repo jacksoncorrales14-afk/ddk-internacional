@@ -11,22 +11,6 @@ export default function AdminPage() {
   const router = useRouter();
   const [stats, setStats] = useState({ candidatos: 0, trabajadores: 0, registrosHoy: 0 });
   const [loading, setLoading] = useState(true);
-  const [verificando, setVerificando] = useState(false);
-
-  async function verificarAusencias() {
-    setVerificando(true);
-    try {
-      const res = await fetch("/api/admin/ausencias", { method: "POST" });
-      const data = await res.json();
-      alert(data.ausentes > 0
-        ? `Se detectaron ${data.ausentes} trabajador(es) ausente(s). Revisa las notificaciones.`
-        : "No se detectaron ausencias."
-      );
-    } finally {
-      setVerificando(false);
-    }
-  }
-
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
@@ -76,18 +60,6 @@ export default function AdminPage() {
           <p className="text-sm text-gray-500">Registros Hoy</p>
         </div>
       </div>
-
-      {/* Boton de verificar ausencias */}
-      <button
-        onClick={verificarAusencias}
-        disabled={verificando}
-        className="mb-4 w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-sm font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-60"
-      >
-        {verificando ? "Verificando..." : "Verificar ausencias ahora"}
-        <span className="ml-2 text-xs font-normal text-amber-600">
-          (Detecta trabajadores que no han marcado entrada segun su horario)
-        </span>
-      </button>
 
       {/* Boton de Emergencia */}
       <Link

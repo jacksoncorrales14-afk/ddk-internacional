@@ -9,145 +9,6 @@ import BuscadorTexto from "@/components/admin/BuscadorTexto";
 import { TableSkeleton } from "@/components/Skeleton";
 import Breadcrumb from "@/components/admin/Breadcrumb";
 
-const DIAS_SEMANA = [
-  { value: 1, label: "Lunes", short: "L" },
-  { value: 2, label: "Martes", short: "M" },
-  { value: 3, label: "Miercoles", short: "X" },
-  { value: 4, label: "Jueves", short: "J" },
-  { value: 5, label: "Viernes", short: "V" },
-  { value: 6, label: "Sabado", short: "S" },
-  { value: 7, label: "Domingo", short: "D" },
-];
-
-const DIAS_LEGACY = [
-  { value: "1", label: "L" },
-  { value: "2", label: "M" },
-  { value: "3", label: "X" },
-  { value: "4", label: "J" },
-  { value: "5", label: "V" },
-  { value: "6", label: "S" },
-  { value: "7", label: "D" },
-];
-
-interface HorarioDiaForm {
-  diaSemana: number;
-  enabled: boolean;
-  horaInicio: string;
-  horaFin: string;
-  toleranciaMin: number;
-}
-
-function defaultHorarios(): HorarioDiaForm[] {
-  return DIAS_SEMANA.map((d) => ({
-    diaSemana: d.value,
-    enabled: d.value <= 5, // Mon-Fri enabled by default
-    horaInicio: "",
-    horaFin: "",
-    toleranciaMin: 15,
-  }));
-}
-
-function horariosFromTrabajador(t: Trabajador): HorarioDiaForm[] {
-  return DIAS_SEMANA.map((d) => {
-    const existing = t.horarios?.find((h) => h.diaSemana === d.value);
-    return {
-      diaSemana: d.value,
-      enabled: !!existing,
-      horaInicio: existing?.horaInicio || "",
-      horaFin: existing?.horaFin || "",
-      toleranciaMin: existing?.toleranciaMin ?? 15,
-    };
-  });
-}
-
-function formatearHorario(t: Trabajador): string {
-  if (t.horarios && t.horarios.length > 0) {
-    const dias = t.horarios
-      .map((h) => DIAS_SEMANA.find((d) => d.value === h.diaSemana)?.short || "")
-      .join("");
-    const first = t.horarios[0];
-    return `${first.horaInicio}-${first.horaFin} ${dias}`;
-  }
-  if (!t.horaInicio || !t.horaFin) return "Sin horario";
-  const dias = (t.diasSemana || "")
-    .split(",")
-    .filter(Boolean)
-    .map((d) => DIAS_LEGACY.find((dd) => dd.value === d)?.label || "")
-    .join("");
-  return `${t.horaInicio}-${t.horaFin}${dias ? " " + dias : ""}`;
-}
-
-function HorarioDiaEditor({
-  horarios,
-  onChange,
-}: {
-  horarios: HorarioDiaForm[];
-  onChange: (h: HorarioDiaForm[]) => void;
-}) {
-  const update = (idx: number, field: keyof HorarioDiaForm, value: unknown) => {
-    const next = [...horarios];
-    next[idx] = { ...next[idx], [field]: value };
-    onChange(next);
-  };
-
-  return (
-    <div className="space-y-2">
-      <div className="hidden sm:grid sm:grid-cols-[120px_1fr_1fr_1fr_80px] gap-2 text-xs font-medium text-gray-500 px-1">
-        <span>Dia</span>
-        <span>Hora inicio</span>
-        <span>Hora fin</span>
-        <span>Tolerancia</span>
-        <span></span>
-      </div>
-      {horarios.map((h, idx) => {
-        const dia = DIAS_SEMANA.find((d) => d.value === h.diaSemana);
-        return (
-          <div
-            key={h.diaSemana}
-            className={`grid grid-cols-1 sm:grid-cols-[120px_1fr_1fr_1fr_80px] gap-2 items-center rounded-lg border p-2 ${
-              h.enabled ? "border-primary-200 bg-primary-50/50" : "border-gray-200 bg-gray-50"
-            }`}
-          >
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={h.enabled}
-                onChange={(e) => update(idx, "enabled", e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-primary-600"
-              />
-              <span className="text-sm font-medium text-gray-700">{dia?.label}</span>
-            </label>
-            <input
-              type="time"
-              value={h.horaInicio}
-              onChange={(e) => update(idx, "horaInicio", e.target.value)}
-              disabled={!h.enabled}
-              className="input-field text-sm disabled:opacity-40"
-            />
-            <input
-              type="time"
-              value={h.horaFin}
-              onChange={(e) => update(idx, "horaFin", e.target.value)}
-              disabled={!h.enabled}
-              className="input-field text-sm disabled:opacity-40"
-            />
-            <input
-              type="number"
-              value={h.toleranciaMin}
-              onChange={(e) => update(idx, "toleranciaMin", parseInt(e.target.value) || 0)}
-              disabled={!h.enabled}
-              min="0"
-              className="input-field text-sm disabled:opacity-40"
-              placeholder="min"
-            />
-            <span className="text-xs text-gray-400 sm:text-center">min</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 const LICENCIAS = [
   { group: "Tipo A - Motocicletas", options: [
     { value: "A1", label: "A1 - Motocicletas menores de 125cc" },
@@ -195,10 +56,9 @@ interface WorkerComponentProps {
   toggleActivo: (id: string, activo: boolean) => void;
   resetearPassword: (id: string, nombre: string) => void;
   handleDelete: (id: string, nombre: string) => void;
-  formatearHorario: (t: Trabajador) => string;
 }
 
-function MobileWorkerCard({ t, abrirEditor, toggleActivo, resetearPassword, handleDelete, formatearHorario }: WorkerComponentProps) {
+function MobileWorkerCard({ t, abrirEditor, toggleActivo, resetearPassword, handleDelete }: WorkerComponentProps) {
   return (
     <div className="card p-4">
       <div className="flex items-start justify-between">
@@ -221,7 +81,6 @@ function MobileWorkerCard({ t, abrirEditor, toggleActivo, resetearPassword, hand
       <div className="mt-2 space-y-1 text-xs text-gray-500">
         <p>Cedula: {t.cedula}</p>
         <p>Ubicacion: {t.ubicacion}</p>
-        <p>Horario: {formatearHorario(t)}</p>
         {t.enServicio && t.ubicacionActual && (
           <p className="font-medium text-primary-600">En: {t.ubicacionActual}</p>
         )}
@@ -236,7 +95,7 @@ function MobileWorkerCard({ t, abrirEditor, toggleActivo, resetearPassword, hand
   );
 }
 
-function WorkerTableRow({ t, abrirEditor, toggleActivo, resetearPassword, handleDelete, formatearHorario }: WorkerComponentProps) {
+function WorkerTableRow({ t, abrirEditor, toggleActivo, resetearPassword, handleDelete }: WorkerComponentProps) {
   return (
     <tr className="hover:bg-gray-50">
       <td className="px-3 py-3">
@@ -247,11 +106,6 @@ function WorkerTableRow({ t, abrirEditor, toggleActivo, resetearPassword, handle
       </td>
       <td className="px-3 py-3 text-sm text-gray-500">{t.cedula}</td>
       <td className="px-3 py-3 text-sm text-gray-500">{t.ubicacion}</td>
-      <td className="px-3 py-3 text-xs text-gray-500">
-        <button onClick={() => abrirEditor(t)} className="text-primary-600 hover:text-primary-800">
-          {formatearHorario(t)}
-        </button>
-      </td>
       <td className="px-3 py-3 text-center">
         <div>
           <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -294,15 +148,12 @@ export default function TrabajadoresPage() {
   const [passwordMostrada, setPasswordMostrada] = useState<{ nombre: string; password: string } | null>(null);
   const [q, setQ] = useState("");
   const [editando, setEditando] = useState<Trabajador | null>(null);
-  const [diasSeleccionados, setDiasSeleccionados] = useState<string[]>([]);
 
   // Create form state
   const [createTipoDoc, setCreateTipoDoc] = useState("cedula");
-  const [createHorarios, setCreateHorarios] = useState<HorarioDiaForm[]>(defaultHorarios);
 
   // Edit form state
   const [editTipoDoc, setEditTipoDoc] = useState("cedula");
-  const [editHorarios, setEditHorarios] = useState<HorarioDiaForm[]>(defaultHorarios);
 
   const [filtroUbicacion, setFiltroUbicacion] = useState<string>("Todos");
   const [seccionesAbiertas, setSeccionesAbiertas] = useState<Record<string, boolean>>({});
@@ -390,19 +241,6 @@ export default function TrabajadoresPage() {
     if (licencia) data.licenciaConducir = licencia;
     data.cursoBasicoPolicial = form.get("cursoBasicoPolicial") === "true";
 
-    // Per-day schedules
-    const enabledHorarios = createHorarios
-      .filter((h) => h.enabled && h.horaInicio && h.horaFin)
-      .map((h) => ({
-        diaSemana: h.diaSemana,
-        horaInicio: h.horaInicio,
-        horaFin: h.horaFin,
-        toleranciaMin: h.toleranciaMin,
-      }));
-    if (enabledHorarios.length > 0) {
-      data.horarios = enabledHorarios;
-    }
-
     const res = await fetch("/api/admin/trabajadores", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -416,14 +254,13 @@ export default function TrabajadoresPage() {
       setShowForm(false);
       setPasswordMostrada({ nombre: nombreCreado, password: passwordAsignada });
       setCreateTipoDoc("cedula");
-      setCreateHorarios(defaultHorarios());
       mutate();
     } else {
       const errData = await res.json().catch(() => ({}));
       alert(errData.error || "Error al crear el trabajador");
     }
     setFormLoading(false);
-  }, [mutate, createHorarios]);
+  }, [mutate]);
 
   const toggleActivo = useCallback(async (id: string, activo: boolean) => {
     await fetch(`/api/admin/trabajadores/${id}`, {
@@ -469,9 +306,7 @@ export default function TrabajadoresPage() {
 
   const abrirEditor = useCallback((t: Trabajador) => {
     setEditando(t);
-    setDiasSeleccionados((t.diasSemana || "").split(",").filter(Boolean));
     setEditTipoDoc(t.tipoDocumento || "cedula");
-    setEditHorarios(horariosFromTrabajador(t));
   }, []);
 
   const guardarEdicion = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
@@ -485,11 +320,6 @@ export default function TrabajadoresPage() {
       telefono: form.get("telefono") as string,
       puesto: form.get("puesto") as string,
       ubicacion: form.get("ubicacion") as string,
-      horaInicio: (form.get("horaInicio") as string) || null,
-      horaFin: (form.get("horaFin") as string) || null,
-      toleranciaMin: parseInt(form.get("toleranciaMin") as string) || 15,
-      diasSemana: diasSeleccionados.join(","),
-      // New personal fields
       tipoDocumento: form.get("tipoDocumento") as string || null,
       fechaNacimiento: (form.get("fechaNacimiento") as string) || null,
       paisOrigen: (form.get("paisOrigen") as string) || null,
@@ -504,17 +334,6 @@ export default function TrabajadoresPage() {
       cursoBasicoPolicial: form.get("cursoBasicoPolicial") === "true",
     };
 
-    // Per-day schedules
-    const enabledHorarios = editHorarios
-      .filter((h) => h.enabled && h.horaInicio && h.horaFin)
-      .map((h) => ({
-        diaSemana: h.diaSemana,
-        horaInicio: h.horaInicio,
-        horaFin: h.horaFin,
-        toleranciaMin: h.toleranciaMin,
-      }));
-    data.horarios = enabledHorarios;
-
     await fetch(`/api/admin/trabajadores/${editando.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -522,7 +341,7 @@ export default function TrabajadoresPage() {
     });
     setEditando(null);
     mutate();
-  }, [editando, diasSeleccionados, editHorarios, mutate]);
+  }, [editando, mutate]);
 
   if (status === "loading") {
     return (
@@ -729,13 +548,6 @@ export default function TrabajadoresPage() {
             </label>
           </div>
 
-          {/* Horario por dia */}
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
-            <h3 className="text-sm font-semibold text-gray-700">Horario Laboral por Dia (opcional)</h3>
-            <p className="text-xs text-gray-500">Configure el horario de trabajo para cada dia de la semana. Los dias sin marcar no se consideran laborales.</p>
-            <HorarioDiaEditor horarios={createHorarios} onChange={setCreateHorarios} />
-          </div>
-
           <button type="submit" className="btn-primary" disabled={formLoading}>
             {formLoading ? "Creando..." : "Crear Trabajador"}
           </button>
@@ -871,17 +683,6 @@ export default function TrabajadoresPage() {
                 </label>
               </div>
 
-              {/* Horario por dia */}
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
-                <h3 className="text-sm font-semibold text-gray-700">Horario Laboral por Dia</h3>
-                <HorarioDiaEditor horarios={editHorarios} onChange={setEditHorarios} />
-              </div>
-
-              {/* Legacy schedule fields (hidden, for backward compat) */}
-              <input type="hidden" name="horaInicio" value="" />
-              <input type="hidden" name="horaFin" value="" />
-              <input type="hidden" name="toleranciaMin" value="15" />
-
               <div className="flex gap-3 pt-2">
                 <button type="submit" className="btn-primary flex-1">Guardar Cambios</button>
                 <button type="button" onClick={() => setEditando(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
@@ -912,7 +713,7 @@ export default function TrabajadoresPage() {
               {seccionesAbiertas[ubicacion] !== false && (
                 <div className="space-y-3 mb-4">
                   {workers.map((t) => (
-                    <MobileWorkerCard key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} formatearHorario={formatearHorario} />
+                    <MobileWorkerCard key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} />
                   ))}
                 </div>
               )}
@@ -920,7 +721,7 @@ export default function TrabajadoresPage() {
           ))
         ) : (
           (trabajadoresOrdenados || []).map((t) => (
-            <MobileWorkerCard key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} formatearHorario={formatearHorario} />
+            <MobileWorkerCard key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} />
           ))
         )}
       </div>
@@ -939,7 +740,6 @@ export default function TrabajadoresPage() {
                   <th scope="col" className="px-3 py-3">Nombre</th>
                   <th scope="col" className="px-3 py-3">Cedula</th>
                   <th scope="col" className="px-3 py-3">Ubicacion</th>
-                  <th scope="col" className="px-3 py-3">Horario</th>
                   <th scope="col" className="px-3 py-3 text-center">Estado</th>
                   <th scope="col" className="px-3 py-3 text-center">Dias</th>
                   <th scope="col" className="px-3 py-3 text-center">Horas</th>
@@ -951,7 +751,7 @@ export default function TrabajadoresPage() {
                   gruposPorUbicacion.map(([ubicacion, workers]) => (
                     <>
                       <tr key={`header-${ubicacion}`} className="bg-gray-100 cursor-pointer" onClick={() => toggleSeccion(ubicacion)}>
-                        <td colSpan={8} className="px-3 py-2">
+                        <td colSpan={7} className="px-3 py-2">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-bold text-gray-700">{ubicacion} ({workers.length})</span>
                             <svg className={`h-4 w-4 text-gray-500 transition-transform ${seccionesAbiertas[ubicacion] === false ? "" : "rotate-180"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -959,13 +759,13 @@ export default function TrabajadoresPage() {
                         </td>
                       </tr>
                       {seccionesAbiertas[ubicacion] !== false && workers.map((t) => (
-                        <WorkerTableRow key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} formatearHorario={formatearHorario} />
+                        <WorkerTableRow key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} />
                       ))}
                     </>
                   ))
                 ) : (
                   (trabajadoresOrdenados || []).map((t) => (
-                    <WorkerTableRow key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} formatearHorario={formatearHorario} />
+                    <WorkerTableRow key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} />
                   ))
                 )}
               </tbody>
