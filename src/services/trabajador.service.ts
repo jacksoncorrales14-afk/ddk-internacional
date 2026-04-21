@@ -43,10 +43,17 @@ export async function listarTrabajadoresConStats(q?: string) {
         FROM "RegistroHorario"
         ORDER BY "trabajadorId", "fecha" DESC
       ),
-      estadisticas AS (
+      dias_trabajados AS (
+        SELECT
+          "trabajadorId",
+          COUNT(DISTINCT DATE("fecha")) AS "diasTrabajados"
+        FROM "RegistroHorario"
+        WHERE "tipo" = 'entrada'
+        GROUP BY "trabajadorId"
+      ),
+      horas_totales AS (
         SELECT
           e."trabajadorId",
-          COUNT(DISTINCT DATE(e."fecha")) AS "diasTrabajados",
           COALESCE(SUM(
             EXTRACT(EPOCH FROM (s."fecha" - e."fecha")) / 3600
           ), 0) AS "horasTotales"
@@ -62,6 +69,14 @@ export async function listarTrabajadoresConStats(q?: string) {
         ) s ON true
         WHERE e."tipo" = 'entrada'
         GROUP BY e."trabajadorId"
+      ),
+      estadisticas AS (
+        SELECT
+          COALESCE(d."trabajadorId", h."trabajadorId") AS "trabajadorId",
+          COALESCE(d."diasTrabajados", 0) AS "diasTrabajados",
+          COALESCE(h."horasTotales", 0) AS "horasTotales"
+        FROM dias_trabajados d
+        FULL OUTER JOIN horas_totales h ON d."trabajadorId" = h."trabajadorId"
       )
       SELECT
         COALESCE(u."trabajadorId", st."trabajadorId") AS "trabajadorId",
