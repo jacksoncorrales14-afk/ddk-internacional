@@ -206,60 +206,65 @@ export default function TrabajadoresPage() {
   const handleCreate = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormLoading(true);
-    const form = new FormData(e.currentTarget);
-    const data: Record<string, unknown> = {};
+    try {
+      const form = new FormData(e.currentTarget);
+      const data: Record<string, unknown> = {};
 
-    // Basic fields
-    data.nombre = form.get("nombre") as string;
-    data.cedula = form.get("cedula") as string;
-    data.password = form.get("password") as string;
-    data.email = form.get("email") as string;
-    data.telefono = form.get("telefono") as string;
-    data.puesto = form.get("puesto") as string;
-    data.ubicacion = form.get("ubicacion") as string;
+      // Basic fields
+      data.nombre = form.get("nombre") as string;
+      data.cedula = form.get("cedula") as string;
+      data.password = form.get("password") as string;
+      data.email = form.get("email") as string;
+      data.telefono = form.get("telefono") as string;
+      data.puesto = form.get("puesto") as string;
+      data.ubicacion = form.get("ubicacion") as string;
 
-    // New personal fields
-    data.tipoDocumento = form.get("tipoDocumento") as string;
-    const fechaNac = form.get("fechaNacimiento") as string;
-    if (fechaNac) data.fechaNacimiento = fechaNac;
-    const paisOrigen = form.get("paisOrigen") as string;
-    if (paisOrigen) data.paisOrigen = paisOrigen;
-    const direccion = form.get("direccion") as string;
-    if (direccion) data.direccion = direccion;
+      // New personal fields
+      data.tipoDocumento = form.get("tipoDocumento") as string;
+      const fechaNac = form.get("fechaNacimiento") as string;
+      if (fechaNac) data.fechaNacimiento = fechaNac;
+      const paisOrigen = form.get("paisOrigen") as string;
+      if (paisOrigen) data.paisOrigen = paisOrigen;
+      const direccion = form.get("direccion") as string;
+      if (direccion) data.direccion = direccion;
 
-    // Experience fields
-    const anios = form.get("aniosExperiencia") as string;
-    if (anios) data.aniosExperiencia = parseInt(anios);
-    const experiencia = form.get("experiencia") as string;
-    if (experiencia) data.experiencia = experiencia;
-    const disponibilidad = form.get("disponibilidad") as string;
-    if (disponibilidad) data.disponibilidad = disponibilidad;
+      // Experience fields
+      const anios = form.get("aniosExperiencia") as string;
+      if (anios) data.aniosExperiencia = parseInt(anios);
+      const experiencia = form.get("experiencia") as string;
+      if (experiencia) data.experiencia = experiencia;
+      const disponibilidad = form.get("disponibilidad") as string;
+      if (disponibilidad) data.disponibilidad = disponibilidad;
 
-    // Certifications
-    data.portacionArma = form.get("portacionArma") === "true";
-    const licencia = form.get("licenciaConducir") as string;
-    if (licencia) data.licenciaConducir = licencia;
-    data.cursoBasicoPolicial = form.get("cursoBasicoPolicial") === "true";
+      // Certifications
+      data.portacionArma = form.get("portacionArma") === "true";
+      const licencia = form.get("licenciaConducir") as string;
+      if (licencia) data.licenciaConducir = licencia;
+      data.cursoBasicoPolicial = form.get("cursoBasicoPolicial") === "true";
 
-    const res = await fetch("/api/admin/trabajadores", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
+      const res = await fetch("/api/admin/trabajadores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
 
-    if (res.ok) {
-      await res.json();
-      const passwordAsignada = data.password as string;
-      const nombreCreado = data.nombre as string;
-      setShowForm(false);
-      setPasswordMostrada({ nombre: nombreCreado, password: passwordAsignada });
-      setCreateTipoDoc("cedula");
-      mutate();
-    } else {
-      const errData = await res.json().catch(() => ({}));
-      alert(errData.error || "Error al crear el trabajador");
+      if (res.ok) {
+        await res.json();
+        const passwordAsignada = data.password as string;
+        const nombreCreado = data.nombre as string;
+        setShowForm(false);
+        setPasswordMostrada({ nombre: nombreCreado, password: passwordAsignada });
+        setCreateTipoDoc("cedula");
+        mutate();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || "Error al crear el trabajador");
+      }
+    } catch {
+      alert("Error de conexion al crear el trabajador");
+    } finally {
+      setFormLoading(false);
     }
-    setFormLoading(false);
   }, [mutate]);
 
   const toggleActivo = useCallback(async (id: string, activo: boolean) => {

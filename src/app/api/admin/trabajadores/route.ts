@@ -51,24 +51,33 @@ export async function POST(req: NextRequest) {
     portacionArma, licenciaConducir, cursoBasicoPolicial,
   } = validated.data;
 
-  const trabajador = await crearTrabajador({
-    nombre, cedula, password, email, telefono, puesto, ubicacion,
-    tipoDocumento,
-    fechaNacimiento,
-    paisOrigen,
-    direccion,
-    experiencia,
-    aniosExperiencia: aniosExperiencia != null ? Number(aniosExperiencia) : undefined,
-    disponibilidad,
-    portacionArma: portacionArma === true,
-    licenciaConducir: licenciaConducir || undefined,
-    cursoBasicoPolicial: cursoBasicoPolicial === true,
-  });
+  try {
+    const trabajador = await crearTrabajador({
+      nombre, cedula, password, email, telefono, puesto, ubicacion,
+      tipoDocumento,
+      fechaNacimiento,
+      paisOrigen,
+      direccion,
+      experiencia,
+      aniosExperiencia: aniosExperiencia != null ? Number(aniosExperiencia) : undefined,
+      disponibilidad,
+      portacionArma: portacionArma === true,
+      licenciaConducir: licenciaConducir || undefined,
+      cursoBasicoPolicial: cursoBasicoPolicial === true,
+    });
 
-  await registrarAccion(session, "trabajador_creado", "Trabajador", trabajador.id, {
-    nombre: trabajador.nombre,
-    ubicacion: trabajador.ubicacion,
-  });
+    await registrarAccion(session, "trabajador_creado", "Trabajador", trabajador.id, {
+      nombre: trabajador.nombre,
+      ubicacion: trabajador.ubicacion,
+    });
 
-  return NextResponse.json(trabajador, { status: 201 });
+    return NextResponse.json(trabajador, { status: 201 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Error al crear el trabajador";
+    const isDuplicate = message.includes("Unique constraint");
+    return NextResponse.json(
+      { error: isDuplicate ? "Ya existe un trabajador con esa cedula" : message },
+      { status: isDuplicate ? 409 : 500 }
+    );
+  }
 }
