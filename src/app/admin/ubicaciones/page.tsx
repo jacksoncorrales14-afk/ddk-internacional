@@ -16,6 +16,10 @@ export default function UbicacionesPage() {
   const [editNombre, setEditNombre] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  // QR state
+  const [qrData, setQrData] = useState<{ puesto: string; qrDataUrl: string } | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+
   const isAdmin = session?.user?.role === "admin";
   const { data: ubicaciones, mutate } = useApiGet<Ubicacion[]>(
     isAdmin ? "/api/admin/ubicaciones" : null
@@ -85,6 +89,47 @@ export default function UbicacionesPage() {
     }
   }, [editNombre, mutate]);
 
+  // QR functions
+  const generarQR = useCallback(async (puesto: string) => {
+    setQrLoading(true);
+    try {
+      const res = await fetch(`/api/admin/qr?puesto=${encodeURIComponent(puesto)}`);
+      const data = await res.json();
+      setQrData(data);
+    } catch {
+      alert("Error al generar QR");
+    }
+    setQrLoading(false);
+  }, []);
+
+  const descargarQR = useCallback(() => {
+    if (!qrData) return;
+    const link = document.createElement("a");
+    link.download = `QR-${qrData.puesto}.png`;
+    link.href = qrData.qrDataUrl;
+    link.click();
+  }, [qrData]);
+
+  const imprimirQR = useCallback(() => {
+    if (!qrData) return;
+    const win = window.open("", "_blank");
+    if (win) {
+      win.document.write(`
+        <html>
+          <head><title>QR - ${qrData.puesto}</title></head>
+          <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:Arial,sans-serif;">
+            <h2 style="color:#102a43;">DDK Internacional</h2>
+            <h3>${qrData.puesto}</h3>
+            <img src="${qrData.qrDataUrl}" style="width:300px;height:300px;" />
+            <p style="color:#666;margin-top:20px;">Escanee este codigo para marcar entrada/salida</p>
+          </body>
+        </html>
+      `);
+      win.document.close();
+      win.print();
+    }
+  }, [qrData]);
+
   if (status === "loading" || !ubicaciones) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
@@ -105,10 +150,10 @@ export default function UbicacionesPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-      <Breadcrumb items={[{ label: "Admin", href: "/admin" }, { label: "Ubicaciones" }]} />
+      <Breadcrumb items={[{ label: "Admin", href: "/admin" }, { label: "Ubicaciones y QR" }]} />
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Ubicaciones</h1>
-        <p className="text-sm text-gray-500">Gestiona las ubicaciones disponibles para asignar trabajadores</p>
+        <h1 className="text-3xl font-bold text-gray-900">Ubicaciones y Codigos QR</h1>
+        <p className="text-sm text-gray-500">Gestiona ubicaciones y genera codigos QR para marcar entrada/salida</p>
       </div>
 
       {/* Form to add */}
@@ -137,72 +182,113 @@ export default function UbicacionesPage() {
         ) : (
           <div className="divide-y divide-gray-100">
             {ubicaciones.map((u) => (
-              <div key={u.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  {editandoId === u.id ? (
-                    <div className="flex items-center gap-2 flex-1">
-                      <input
-                        type="text"
-                        value={editNombre}
-                        onChange={(e) => setEditNombre(e.target.value)}
-                        className="input-field flex-1"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleSaveEdit(u.id);
-                          if (e.key === "Escape") setEditandoId(null);
-                        }}
-                      />
+              <div key={u.id} className="px-4 py-3 hover:bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {editandoId === u.id ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <input
+                          type="text"
+                          value={editNombre}
+                          onChange={(e) => setEditNombre(e.target.value)}
+                          className="input-field flex-1"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveEdit(u.id);
+                            if (e.key === "Escape") setEditandoId(null);
+                          }}
+                        />
+                        <button
+                          onClick={() => handleSaveEdit(u.id)}
+                          className="text-xs font-medium text-green-600 hover:text-green-800"
+                        >
+                          Guardar
+                        </button>
+                        <button
+                          onClick={() => setEditandoId(null)}
+                          className="text-xs font-medium text-gray-400 hover:text-gray-600"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className={`text-sm font-medium ${u.activa ? "text-gray-900" : "text-gray-400 line-through"}`}>
+                          {u.nombre}
+                        </span>
+                        {!u.activa && (
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">Inactiva</span>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {editandoId !== u.id && (
+                    <div className="flex items-center gap-3 shrink-0 ml-3">
+                      {u.activa && (
+                        <button
+                          onClick={() => generarQR(u.nombre)}
+                          disabled={qrLoading}
+                          className={`text-xs font-medium text-purple-600 hover:text-purple-800 ${
+                            qrData?.puesto === u.nombre ? "underline" : ""
+                          }`}
+                        >
+                          {qrLoading && qrData?.puesto === u.nombre ? "..." : "QR"}
+                        </button>
+                      )}
                       <button
-                        onClick={() => handleSaveEdit(u.id)}
-                        className="text-xs font-medium text-green-600 hover:text-green-800"
+                        onClick={() => startEdit(u)}
+                        className="text-xs font-medium text-primary-600 hover:text-primary-800"
                       >
-                        Guardar
+                        Editar
                       </button>
                       <button
-                        onClick={() => setEditandoId(null)}
-                        className="text-xs font-medium text-gray-400 hover:text-gray-600"
+                        onClick={() => handleToggle(u.id, u.activa)}
+                        className={`text-xs font-medium ${u.activa ? "text-amber-600 hover:text-amber-800" : "text-green-600 hover:text-green-800"}`}
                       >
-                        Cancelar
+                        {u.activa ? "Desactivar" : "Activar"}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(u.id, u.nombre)}
+                        className="text-xs font-medium text-red-400 hover:text-red-600"
+                      >
+                        Eliminar
                       </button>
                     </div>
-                  ) : (
-                    <>
-                      <span className={`text-sm font-medium ${u.activa ? "text-gray-900" : "text-gray-400 line-through"}`}>
-                        {u.nombre}
-                      </span>
-                      {!u.activa && (
-                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">Inactiva</span>
-                      )}
-                    </>
                   )}
                 </div>
-                {editandoId !== u.id && (
-                  <div className="flex items-center gap-3 shrink-0 ml-3">
-                    <button
-                      onClick={() => startEdit(u)}
-                      className="text-xs font-medium text-primary-600 hover:text-primary-800"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => handleToggle(u.id, u.activa)}
-                      className={`text-xs font-medium ${u.activa ? "text-amber-600 hover:text-amber-800" : "text-green-600 hover:text-green-800"}`}
-                    >
-                      {u.activa ? "Desactivar" : "Activar"}
-                    </button>
-                    <button
-                      onClick={() => handleDelete(u.id, u.nombre)}
-                      className="text-xs font-medium text-red-400 hover:text-red-600"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* QR Display */}
+      {qrData && (
+        <div className="mt-6 card text-center">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900">{qrData.puesto}</h2>
+            <button
+              onClick={() => setQrData(null)}
+              className="text-gray-400 hover:text-gray-600"
+              aria-label="Cerrar"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={qrData.qrDataUrl} alt={`QR ${qrData.puesto}`} className="mx-auto mb-4" style={{ width: 300, height: 300 }} />
+          <div className="flex justify-center gap-3">
+            <button onClick={descargarQR} className="btn-primary">
+              Descargar QR
+            </button>
+            <button onClick={imprimirQR} className="btn-secondary">
+              Imprimir QR
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

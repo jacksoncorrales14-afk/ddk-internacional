@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { Trabajador, Ubicacion } from "@/types/models";
+import { Trabajador, Ubicacion, Jornada, JornadasAgrupadas, tipoDocLabels } from "@/types/models";
 import { useApiGet } from "@/hooks/useApi";
 import BuscadorTexto from "@/components/admin/BuscadorTexto";
 import { TableSkeleton } from "@/components/Skeleton";
@@ -35,6 +35,9 @@ const LICENCIAS = [
   ]},
 ];
 
+const LICENCIA_LABELS: Record<string, string> = {};
+LICENCIAS.forEach((g) => g.options.forEach((o) => { LICENCIA_LABELS[o.value] = o.label; }));
+
 function LicenciaSelect({ name, defaultValue }: { name: string; defaultValue?: string }) {
   return (
     <select name={name} defaultValue={defaultValue || ""} className="input-field">
@@ -50,20 +53,279 @@ function LicenciaSelect({ name, defaultValue }: { name: string; defaultValue?: s
   );
 }
 
+function formatFecha(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("es-CR", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatHora(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleTimeString("es-CR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatDuracion(min: number) {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h === 0) return `${m}min`;
+  return m > 0 ? `${h}h ${m}min` : `${h}h`;
+}
+
+// ─── Detail Modal ───
+
+function WorkerDetailModal({
+  t,
+  onClose,
+  onEdit,
+  onToggle,
+  onResetPassword,
+  onDelete,
+}: {
+  t: Trabajador;
+  onClose: () => void;
+  onEdit: (t: Trabajador) => void;
+  onToggle: (id: string, activo: boolean) => void;
+  onResetPassword: (id: string, nombre: string) => void;
+  onDelete: (id: string, nombre: string) => void;
+}) {
+  const { data: jornadas } = useApiGet<JornadasAgrupadas>(
+    `/api/admin/registros?trabajadorId=${t.id}&agrupado=1&limit=200`
+  );
+
+  // Flatten all jornadas into a single sorted list
+  const todasJornadas: Jornada[] = [];
+  if (jornadas) {
+    for (const arr of Object.values(jornadas)) {
+      todasJornadas.push(...arr);
+    }
+    todasJornadas.sort((a, b) => {
+      const ta = a.entrada || a.salida || "";
+      const tb = b.entrada || b.salida || "";
+      return new Date(tb).getTime() - new Date(ta).getTime();
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4 rounded-t-xl">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">{t.nombre}</h2>
+            <p className="text-sm capitalize text-gray-500">{t.puesto} - {t.ubicacion}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+              !t.activo
+                ? "bg-gray-100 text-gray-600"
+                : t.enServicio
+                  ? "bg-green-100 text-green-700"
+                  : "bg-red-100 text-red-700"
+            }`}>
+              {!t.activo ? "Inactivo" : t.enServicio ? "En servicio" : "Ausente"}
+            </span>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600" aria-label="Cerrar">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="px-6 py-5 space-y-6">
+          {/* Stats cards */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-lg bg-primary-50 p-3 text-center">
+              <p className="text-2xl font-bold text-primary-700">{t.diasTrabajados}</p>
+              <p className="text-xs text-primary-600">Dias trabajados</p>
+            </div>
+            <div className="rounded-lg bg-accent-50 p-3 text-center">
+              <p className="text-2xl font-bold text-accent-700">{t.horasTotales}h</p>
+              <p className="text-xs text-accent-600">Horas totales</p>
+            </div>
+            <div className="rounded-lg bg-green-50 p-3 text-center">
+              <p className="text-2xl font-bold text-green-700">{t.enServicio ? "SI" : "NO"}</p>
+              <p className="text-xs text-green-600">En servicio</p>
+            </div>
+          </div>
+
+          {/* Personal info */}
+          <div className="rounded-lg border border-gray-200 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-gray-700">Datos Personales</h3>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              <div>
+                <span className="text-gray-400">Documento:</span>
+                <span className="ml-2 font-medium text-gray-900">
+                  {tipoDocLabels[t.tipoDocumento || "cedula"] || "Cedula"} - {t.cedula}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-400">Email:</span>
+                <span className="ml-2 font-medium text-gray-900">{t.email}</span>
+              </div>
+              <div>
+                <span className="text-gray-400">Telefono:</span>
+                <span className="ml-2 font-medium text-gray-900">{t.telefono}</span>
+              </div>
+              {t.fechaNacimiento && (
+                <div>
+                  <span className="text-gray-400">Nacimiento:</span>
+                  <span className="ml-2 font-medium text-gray-900">{formatFecha(t.fechaNacimiento)}</span>
+                </div>
+              )}
+              {t.paisOrigen && (
+                <div>
+                  <span className="text-gray-400">Pais:</span>
+                  <span className="ml-2 font-medium text-gray-900">{t.paisOrigen}</span>
+                </div>
+              )}
+              {t.direccion && (
+                <div className="col-span-2">
+                  <span className="text-gray-400">Direccion:</span>
+                  <span className="ml-2 font-medium text-gray-900">{t.direccion}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Certifications & Experience */}
+          <div className="rounded-lg border border-gray-200 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-gray-700">Experiencia y Certificaciones</h3>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {t.portacionArma && (
+                <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">Portacion de Arma</span>
+              )}
+              {t.cursoBasicoPolicial && (
+                <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700">Curso Basico Policial</span>
+              )}
+              {t.licenciaConducir && (
+                <span className="rounded-full bg-teal-100 px-3 py-1 text-xs font-medium text-teal-700">
+                  Licencia {LICENCIA_LABELS[t.licenciaConducir] || t.licenciaConducir}
+                </span>
+              )}
+              {!t.portacionArma && !t.cursoBasicoPolicial && !t.licenciaConducir && (
+                <span className="text-xs text-gray-400">Sin certificaciones registradas</span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              {t.aniosExperiencia != null && (
+                <div>
+                  <span className="text-gray-400">Experiencia:</span>
+                  <span className="ml-2 font-medium text-gray-900">{t.aniosExperiencia} anios</span>
+                </div>
+              )}
+              {t.disponibilidad && (
+                <div>
+                  <span className="text-gray-400">Disponibilidad:</span>
+                  <span className="ml-2 font-medium text-gray-900">{t.disponibilidad}</span>
+                </div>
+              )}
+            </div>
+            {t.experiencia && (
+              <p className="mt-2 text-sm text-gray-600">{t.experiencia}</p>
+            )}
+          </div>
+
+          {/* Work History */}
+          <div className="rounded-lg border border-gray-200 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-gray-700">Historial de Jornadas</h3>
+            {!jornadas ? (
+              <div className="space-y-2">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-10 animate-pulse rounded bg-gray-100" />
+                ))}
+              </div>
+            ) : todasJornadas.length === 0 ? (
+              <p className="py-4 text-center text-sm text-gray-400">No hay jornadas registradas</p>
+            ) : (
+              <div className="max-h-72 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white text-left text-xs uppercase text-gray-400">
+                    <tr>
+                      <th className="pb-2 pr-3">Fecha</th>
+                      <th className="pb-2 pr-3">Entrada</th>
+                      <th className="pb-2 pr-3">Salida</th>
+                      <th className="pb-2 text-right">Duracion</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {todasJornadas.map((j, i) => (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="py-2 pr-3 font-medium text-gray-900">
+                          {j.entrada ? formatFecha(j.entrada) : j.salida ? formatFecha(j.salida) : "-"}
+                        </td>
+                        <td className="py-2 pr-3 text-gray-600">
+                          {j.entrada ? formatHora(j.entrada) : <span className="text-gray-300">-</span>}
+                        </td>
+                        <td className="py-2 pr-3 text-gray-600">
+                          {j.salida ? formatHora(j.salida) : <span className="text-amber-500 text-xs">En curso</span>}
+                        </td>
+                        <td className="py-2 text-right font-medium text-gray-700">
+                          {j.duracionMin > 0 ? formatDuracion(j.duracionMin) : <span className="text-gray-300">-</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-wrap gap-3 border-t border-gray-100 pt-4">
+            <button onClick={() => { onClose(); onEdit(t); }} className="btn-primary text-sm">
+              Editar
+            </button>
+            <button
+              onClick={() => onToggle(t.id, t.activo)}
+              className={`rounded-lg px-4 py-2 text-sm font-medium ${
+                t.activo
+                  ? "bg-red-50 text-red-700 hover:bg-red-100"
+                  : "bg-green-50 text-green-700 hover:bg-green-100"
+              }`}
+            >
+              {t.activo ? "Desactivar" : "Activar"}
+            </button>
+            <button
+              onClick={() => onResetPassword(t.id, t.nombre)}
+              className="rounded-lg bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100"
+            >
+              Resetear Contraseña
+            </button>
+            <button
+              onClick={() => { onClose(); onDelete(t.id, t.nombre); }}
+              className="rounded-lg bg-gray-50 px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-50"
+            >
+              Eliminar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Worker list components ───
+
 interface WorkerComponentProps {
   t: Trabajador;
+  onClickName: (t: Trabajador) => void;
   abrirEditor: (t: Trabajador) => void;
   toggleActivo: (id: string, activo: boolean) => void;
   resetearPassword: (id: string, nombre: string) => void;
   handleDelete: (id: string, nombre: string) => void;
 }
 
-function MobileWorkerCard({ t, abrirEditor, toggleActivo, resetearPassword, handleDelete }: WorkerComponentProps) {
+function MobileWorkerCard({ t, onClickName, abrirEditor, toggleActivo, resetearPassword, handleDelete }: WorkerComponentProps) {
   return (
     <div className="card p-4">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm font-bold text-gray-900">{t.nombre}</p>
+          <button onClick={() => onClickName(t)} className="text-sm font-bold text-primary-700 hover:text-primary-900 hover:underline text-left">
+            {t.nombre}
+          </button>
           <p className="text-xs capitalize text-gray-400">{t.puesto}</p>
         </div>
         <div className="flex items-center gap-1.5">
@@ -95,12 +357,14 @@ function MobileWorkerCard({ t, abrirEditor, toggleActivo, resetearPassword, hand
   );
 }
 
-function WorkerTableRow({ t, abrirEditor, toggleActivo, resetearPassword, handleDelete }: WorkerComponentProps) {
+function WorkerTableRow({ t, onClickName, abrirEditor, toggleActivo, resetearPassword, handleDelete }: WorkerComponentProps) {
   return (
     <tr className="hover:bg-gray-50">
       <td className="px-3 py-3">
         <div>
-          <p className="text-sm font-medium text-gray-900">{t.nombre}</p>
+          <button onClick={() => onClickName(t)} className="text-sm font-medium text-primary-700 hover:text-primary-900 hover:underline text-left">
+            {t.nombre}
+          </button>
           <p className="text-xs capitalize text-gray-400">{t.puesto}</p>
         </div>
       </td>
@@ -140,6 +404,8 @@ function WorkerTableRow({ t, abrirEditor, toggleActivo, resetearPassword, handle
   );
 }
 
+// ─── Main Page ───
+
 export default function TrabajadoresPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -148,6 +414,7 @@ export default function TrabajadoresPage() {
   const [passwordMostrada, setPasswordMostrada] = useState<{ nombre: string; password: string } | null>(null);
   const [q, setQ] = useState("");
   const [editando, setEditando] = useState<Trabajador | null>(null);
+  const [detalle, setDetalle] = useState<Trabajador | null>(null);
 
   // Create form state
   const [createTipoDoc, setCreateTipoDoc] = useState("cedula");
@@ -184,16 +451,13 @@ export default function TrabajadoresPage() {
       if (!grupos[key]) grupos[key] = [];
       grupos[key].push(t);
     }
-    // Sort workers within each group alphabetically
     for (const key of Object.keys(grupos)) {
       grupos[key].sort((a, b) => a.nombre.localeCompare(b.nombre));
     }
-    // Sort groups by ubicacion name
     const sorted = Object.entries(grupos).sort(([a], [b]) => a.localeCompare(b));
     return sorted;
   })();
 
-  // When filtering by specific ubicacion, sort alphabetically
   const trabajadoresOrdenados = (() => {
     if (filtroUbicacion === "Todos" || !trabajadoresFiltrados) return trabajadoresFiltrados;
     return [...trabajadoresFiltrados].sort((a, b) => a.nombre.localeCompare(b.nombre));
@@ -210,7 +474,6 @@ export default function TrabajadoresPage() {
       const form = new FormData(e.currentTarget);
       const data: Record<string, unknown> = {};
 
-      // Basic fields
       data.nombre = form.get("nombre") as string;
       data.cedula = form.get("cedula") as string;
       data.password = form.get("password") as string;
@@ -219,7 +482,6 @@ export default function TrabajadoresPage() {
       data.puesto = form.get("puesto") as string;
       data.ubicacion = form.get("ubicacion") as string;
 
-      // New personal fields
       data.tipoDocumento = form.get("tipoDocumento") as string;
       const fechaNac = form.get("fechaNacimiento") as string;
       if (fechaNac) data.fechaNacimiento = fechaNac;
@@ -228,7 +490,6 @@ export default function TrabajadoresPage() {
       const direccion = form.get("direccion") as string;
       if (direccion) data.direccion = direccion;
 
-      // Experience fields
       const anios = form.get("aniosExperiencia") as string;
       if (anios) data.aniosExperiencia = parseInt(anios);
       const experiencia = form.get("experiencia") as string;
@@ -236,7 +497,6 @@ export default function TrabajadoresPage() {
       const disponibilidad = form.get("disponibilidad") as string;
       if (disponibilidad) data.disponibilidad = disponibilidad;
 
-      // Certifications
       data.portacionArma = form.get("portacionArma") === "true";
       const licencia = form.get("licenciaConducir") as string;
       if (licencia) data.licenciaConducir = licencia;
@@ -301,13 +561,16 @@ export default function TrabajadoresPage() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setEditando(null);
+      if (e.key === "Escape") {
+        if (editando) setEditando(null);
+        else if (detalle) setDetalle(null);
+      }
     };
-    if (editando) {
+    if (editando || detalle) {
       document.addEventListener("keydown", handleKeyDown);
       return () => document.removeEventListener("keydown", handleKeyDown);
     }
-  }, [editando]);
+  }, [editando, detalle]);
 
   const abrirEditor = useCallback((t: Trabajador) => {
     setEditando(t);
@@ -329,11 +592,9 @@ export default function TrabajadoresPage() {
       fechaNacimiento: (form.get("fechaNacimiento") as string) || null,
       paisOrigen: (form.get("paisOrigen") as string) || null,
       direccion: (form.get("direccion") as string) || null,
-      // Experience fields
       aniosExperiencia: parseInt(form.get("aniosExperiencia") as string) || null,
       experiencia: (form.get("experiencia") as string) || null,
       disponibilidad: (form.get("disponibilidad") as string) || null,
-      // Certifications
       portacionArma: form.get("portacionArma") === "true",
       licenciaConducir: (form.get("licenciaConducir") as string) || null,
       cursoBasicoPolicial: form.get("cursoBasicoPolicial") === "true",
@@ -437,7 +698,6 @@ export default function TrabajadoresPage() {
             <p className="text-sm text-gray-500">Asigna una contraseña unica al trabajador para que ingrese con su cedula/pasaporte.</p>
           </div>
 
-          {/* Datos personales */}
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
             <h3 className="text-sm font-semibold text-gray-700">Datos Personales</h3>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -447,12 +707,7 @@ export default function TrabajadoresPage() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Tipo de Documento</label>
-                <select
-                  name="tipoDocumento"
-                  className="input-field"
-                  value={createTipoDoc}
-                  onChange={(e) => setCreateTipoDoc(e.target.value)}
-                >
+                <select name="tipoDocumento" className="input-field" value={createTipoDoc} onChange={(e) => setCreateTipoDoc(e.target.value)}>
                   <option value="cedula">Cedula</option>
                   <option value="pasaporte">Pasaporte</option>
                   <option value="dimex">DIMEX</option>
@@ -491,7 +746,6 @@ export default function TrabajadoresPage() {
             </div>
           </div>
 
-          {/* Puesto y ubicacion */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Puesto</label>
@@ -511,7 +765,6 @@ export default function TrabajadoresPage() {
             </div>
           </div>
 
-          {/* Experiencia */}
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
             <h3 className="text-sm font-semibold text-gray-700">Experiencia</h3>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -530,7 +783,6 @@ export default function TrabajadoresPage() {
             </div>
           </div>
 
-          {/* Certificaciones */}
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
             <h3 className="text-sm font-semibold text-gray-700">Certificaciones</h3>
             <label className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 cursor-pointer hover:bg-gray-50">
@@ -559,7 +811,19 @@ export default function TrabajadoresPage() {
         </form>
       )}
 
-      {/* Modal de edicion de trabajador */}
+      {/* Detail modal */}
+      {detalle && (
+        <WorkerDetailModal
+          t={detalle}
+          onClose={() => setDetalle(null)}
+          onEdit={abrirEditor}
+          onToggle={toggleActivo}
+          onResetPassword={resetearPasswordFn}
+          onDelete={handleDelete}
+        />
+      )}
+
+      {/* Edit modal */}
       {editando && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6">
@@ -572,7 +836,6 @@ export default function TrabajadoresPage() {
               </button>
             </div>
             <form onSubmit={guardarEdicion} className="space-y-5">
-              {/* Datos personales */}
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
                 <h3 className="text-sm font-semibold text-gray-700">Datos Personales</h3>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -582,12 +845,7 @@ export default function TrabajadoresPage() {
                   </div>
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-700">Tipo de Documento</label>
-                    <select
-                      name="tipoDocumento"
-                      className="input-field"
-                      value={editTipoDoc}
-                      onChange={(e) => setEditTipoDoc(e.target.value)}
-                    >
+                    <select name="tipoDocumento" className="input-field" value={editTipoDoc} onChange={(e) => setEditTipoDoc(e.target.value)}>
                       <option value="cedula">Cedula</option>
                       <option value="pasaporte">Pasaporte</option>
                       <option value="dimex">DIMEX</option>
@@ -605,12 +863,7 @@ export default function TrabajadoresPage() {
                   )}
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-700">Fecha de Nacimiento</label>
-                    <input
-                      name="fechaNacimiento"
-                      type="date"
-                      defaultValue={editando.fechaNacimiento ? editando.fechaNacimiento.slice(0, 10) : ""}
-                      className="input-field"
-                    />
+                    <input name="fechaNacimiento" type="date" defaultValue={editando.fechaNacimiento ? editando.fechaNacimiento.slice(0, 10) : ""} className="input-field" />
                   </div>
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
@@ -627,7 +880,6 @@ export default function TrabajadoresPage() {
                 </div>
               </div>
 
-              {/* Puesto y ubicacion */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">Puesto</label>
@@ -646,7 +898,6 @@ export default function TrabajadoresPage() {
                 </div>
               </div>
 
-              {/* Experiencia */}
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
                 <h3 className="text-sm font-semibold text-gray-700">Experiencia</h3>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -665,7 +916,6 @@ export default function TrabajadoresPage() {
                 </div>
               </div>
 
-              {/* Certificaciones */}
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
                 <h3 className="text-sm font-semibold text-gray-700">Certificaciones</h3>
                 <label className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 cursor-pointer hover:bg-gray-50">
@@ -718,7 +968,7 @@ export default function TrabajadoresPage() {
               {seccionesAbiertas[ubicacion] !== false && (
                 <div className="space-y-3 mb-4">
                   {workers.map((t) => (
-                    <MobileWorkerCard key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} />
+                    <MobileWorkerCard key={t.id} t={t} onClickName={setDetalle} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} />
                   ))}
                 </div>
               )}
@@ -726,7 +976,7 @@ export default function TrabajadoresPage() {
           ))
         ) : (
           (trabajadoresOrdenados || []).map((t) => (
-            <MobileWorkerCard key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} />
+            <MobileWorkerCard key={t.id} t={t} onClickName={setDetalle} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} />
           ))
         )}
       </div>
@@ -764,13 +1014,13 @@ export default function TrabajadoresPage() {
                         </td>
                       </tr>
                       {seccionesAbiertas[ubicacion] !== false && workers.map((t) => (
-                        <WorkerTableRow key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} />
+                        <WorkerTableRow key={t.id} t={t} onClickName={setDetalle} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} />
                       ))}
                     </>
                   ))
                 ) : (
                   (trabajadoresOrdenados || []).map((t) => (
-                    <WorkerTableRow key={t.id} t={t} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} />
+                    <WorkerTableRow key={t.id} t={t} onClickName={setDetalle} abrirEditor={abrirEditor} toggleActivo={toggleActivo} resetearPassword={resetearPasswordFn} handleDelete={handleDelete} />
                   ))
                 )}
               </tbody>
