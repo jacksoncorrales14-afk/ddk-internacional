@@ -66,15 +66,15 @@ export default function DespedidosPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-      <Breadcrumb items={[{ label: "Admin", href: "/admin" }, { label: "Trabajadores", href: "/admin/trabajadores" }, { label: "Despedidos" }]} />
+      <Breadcrumb items={[{ label: "Admin", href: "/admin" }, { label: "Trabajadores", href: "/admin/trabajadores" }, { label: "Ex-Trabajadores" }]} />
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Trabajadores Despedidos</h1>
-        <p className="text-sm text-gray-500">{despedidos.length} trabajadores en esta carpeta</p>
+        <h1 className="text-3xl font-bold text-gray-900">Ex-Trabajadores</h1>
+        <p className="text-sm text-gray-500">{despedidos.length} ex-trabajadores en esta carpeta</p>
       </div>
 
       {despedidos.length === 0 ? (
         <div className="card p-12 text-center">
-          <p className="text-gray-400">No hay trabajadores despedidos.</p>
+          <p className="text-gray-400">No hay ex-trabajadores.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -87,7 +87,7 @@ export default function DespedidosPage() {
                 </div>
                 {t.fechaDespido && (
                   <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600">
-                    Despedido {formatFecha(t.fechaDespido)}
+                    Removido {formatFecha(t.fechaDespido)}
                   </span>
                 )}
               </div>

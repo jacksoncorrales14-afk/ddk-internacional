@@ -299,7 +299,7 @@ function WorkerDetailModal({
               onClick={() => { onClose(); onDelete(t.id, t.nombre); }}
               className="rounded-lg bg-gray-50 px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-50"
             >
-              Despedir
+              Remover
             </button>
           </div>
         </div>
@@ -352,7 +352,7 @@ function MobileWorkerCard({ t, onClickName, abrirEditor, toggleActivo, resetearP
         <button onClick={() => abrirEditor(t)} className="text-xs font-medium text-primary-600 hover:text-primary-800">Editar</button>
         <button onClick={() => toggleActivo(t.id, t.activo)} className={`text-xs font-medium ${t.activo ? "text-red-600 hover:text-red-800" : "text-green-600 hover:text-green-800"}`}>{t.activo ? "Desactivar" : "Activar"}</button>
         <button onClick={() => resetearPassword(t.id, t.nombre)} className="text-xs font-medium text-amber-600 hover:text-amber-800">Resetear Contraseña</button>
-        <button onClick={() => handleDelete(t.id, t.nombre)} className="text-xs font-medium text-red-400 hover:text-red-600">Despedir</button>
+        <button onClick={() => handleDelete(t.id, t.nombre)} className="text-xs font-medium text-red-400 hover:text-red-600">Remover</button>
       </div>
     </div>
   );
@@ -397,7 +397,7 @@ function WorkerTableRow({ t, onClickName, abrirEditor, toggleActivo, resetearPas
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => resetearPassword(t.id, t.nombre)} className="text-xs font-medium text-amber-600 hover:text-amber-800">Resetear Contraseña</button>
-            <button onClick={() => handleDelete(t.id, t.nombre)} className="text-xs font-medium text-red-400 hover:text-red-600">Despedir</button>
+            <button onClick={() => handleDelete(t.id, t.nombre)} className="text-xs font-medium text-red-400 hover:text-red-600">Remover</button>
           </div>
         </div>
       </td>
@@ -538,7 +538,7 @@ export default function TrabajadoresPage() {
   }, [mutate]);
 
   const handleDelete = useCallback(async (id: string, nombre: string) => {
-    if (!confirm(`¿Despedir a ${nombre}? Se movera a la carpeta de despedidos.`)) return;
+    if (!confirm(`¿Mover a ${nombre} a ex-trabajadores?`)) return;
     await fetch(`/api/admin/trabajadores/${id}`, { method: "DELETE" });
     mutate();
   }, [mutate]);
@@ -637,7 +637,7 @@ export default function TrabajadoresPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <BuscadorTexto value={q} onChange={setQ} />
           <Link href="/admin/despedidos" className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 text-center">
-            Despedidos
+            Ex-Trabajadores
           </Link>
           <button onClick={() => setShowForm(!showForm)} className="btn-primary">
             {showForm ? "Cancelar" : "+ Nuevo Trabajador"}
