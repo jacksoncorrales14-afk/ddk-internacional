@@ -38,6 +38,8 @@ export interface Trabajador {
   puesto: string;
   ubicacion: string;
   activo: boolean;
+  despedido: boolean;
+  fechaDespido: string | null;
   activado: boolean;
   codigoActivacion: string | null;
   // Campos equivalentes a Candidato

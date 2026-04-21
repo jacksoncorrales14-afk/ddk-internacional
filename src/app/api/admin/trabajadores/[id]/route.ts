@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { actualizarTrabajador, regenerarCodigo, revocarBiometria, resetearPassword, eliminarTrabajador } from "@/services/trabajador.service";
+import { actualizarTrabajador, regenerarCodigo, revocarBiometria, resetearPassword, despedirTrabajador } from "@/services/trabajador.service";
 import { registrarAccion } from "@/lib/audit";
 import { trabajadorUpdateSchema, esIdValido } from "@/lib/validations";
 
@@ -70,7 +70,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: "ID invalido" }, { status: 400 });
   }
 
-  await eliminarTrabajador(params.id);
-  await registrarAccion(session, "trabajador_eliminado", "Trabajador", params.id);
+  const trabajador = await despedirTrabajador(params.id);
+  await registrarAccion(session, "trabajador_despedido", "Trabajador", params.id, {
+    nombre: trabajador.nombre,
+  });
   return NextResponse.json({ success: true });
 }

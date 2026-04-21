@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 // ─── Queries ───
 
 export async function listarTrabajadoresConStats(q?: string) {
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { despedido: false };
   if (q && q.trim()) {
     const term = q.trim();
     where.OR = [
@@ -234,8 +234,29 @@ export async function revocarBiometria(id: string) {
   });
 }
 
-export async function eliminarTrabajador(id: string) {
+export async function despedirTrabajador(id: string) {
+  return prisma.trabajador.update({
+    where: { id },
+    data: { despedido: true, activo: false, fechaDespido: new Date() },
+  });
+}
+
+export async function restaurarTrabajador(id: string) {
+  return prisma.trabajador.update({
+    where: { id },
+    data: { despedido: false, activo: true, fechaDespido: null },
+  });
+}
+
+export async function eliminarTrabajadorDefinitivo(id: string) {
   return prisma.trabajador.delete({ where: { id } });
+}
+
+export async function listarDespedidos() {
+  return prisma.trabajador.findMany({
+    where: { despedido: true },
+    orderBy: { fechaDespido: "desc" },
+  });
 }
 
 export async function actualizarTrabajador(

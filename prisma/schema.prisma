@@ -64,6 +64,8 @@ model Trabajador {
   puesto           String
   ubicacion        String
   activo           Boolean              @default(true)
+  despedido        Boolean              @default(false)
+  fechaDespido     DateTime?
   password         String?
   createdAt        DateTime             @default(now())
   activado         Boolean              @default(false)
@@ -86,6 +88,7 @@ model Trabajador {
   credenciales     WebAuthnCredential[]
 
   @@index([activo])
+  @@index([despedido])
 }
 
 model WebAuthnCredential {
